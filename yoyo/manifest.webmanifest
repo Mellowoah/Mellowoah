@@ -1,0 +1,1 @@
+{"name":"Yo","short_name":"Yo","description":"A pocket yo-yo. Tilt to throw, sleep, and bring it home.","start_url":"./","display":"standalone","orientation":"portrait","background_color":"#09090b","theme_color":"#141210","icons":[{"src":"assets/icon-180.png","sizes":"180x180","type":"image/png"},{"src":"assets/icon-192.png","sizes":"192x192","type":"image/png"}]}
