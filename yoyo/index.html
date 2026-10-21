@@ -16,7 +16,6 @@
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="apple-touch-icon" href="assets/icon-180.png">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="preload" as="image" href="assets/arm.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Fraunces:opsz,wght@9..144,650&family=Outfit:wght@400;500;600;700;800&display=swap">
@@ -698,11 +697,11 @@ const P = { vpx: 0, hy: 0, Yh: 0, Yy0: 0, Dk: 2.3, VS: 1.6, Yf: 0, sf: .3 };
 function layoutView() {
   const chips = document.getElementById("tricks"), ar = app.getBoundingClientRect();
   const barTop = chips ? chips.getBoundingClientRect().top - ar.top - 44 : H * .78; // leave room for a 2-line hint
-  const { len } = armGeom();
+  const hwid = handW();
   P.vpx = W / 2;
   P.hy = insets.top + clamp(H * .27, 150, 250);                 // horizon / vanishing point, upper-middle
-  P.Yh = clamp(Math.min(H * .8, barTop - len * .19 - 6), H * .55, H * .82); // fist rests just above the bottom HUD
-  P.Yy0 = P.Yh - S.R * P.VS * .55;                             // a held yo-yo peeks out above the fingers
+  P.Yh = clamp(Math.min(H * .8, barTop - hwid * 1.05 - 6), H * .55, H * .82); // fist rests just above the bottom HUD
+  P.Yy0 = P.Yh + (H_HELD.y - H_PINCH.y) * hwid;                             // a held yo-yo peeks out above the fingers
   const f = proj(W / 2, S.floorY); P.Yf = f.y; P.sf = f.s;
 }
 function proj(wx, wy) {
@@ -806,7 +805,6 @@ function drawLive(g, t) {
 
 /* ================= Assets ================= */
 function loadImg(src) { const i = new Image(); i.decoding = "async"; i.src = src; return i; }
-const armImg = loadImg("assets/arm.png");
 const bokeh = Array.from({ length: 18 }, () => ({ x: Math.random(), y: Math.random(), r: 8 + Math.random() * 34, s: .004 + Math.random() * .012, a: .025 + Math.random() * .05, p: Math.random() * TAU }));
 function makeGlow(rgb) { const c = document.createElement("canvas"); c.width = c.height = 64; const g = c.getContext("2d"); const r = g.createRadialGradient(32, 32, 0, 32, 32, 32); r.addColorStop(0, "rgba(255,245,225,1)"); r.addColorStop(.4, `rgba(${rgb},.38)`); r.addColorStop(1, `rgba(${rgb},0)`); g.fillStyle = r; g.fillRect(0, 0, 64, 64); return c; }
 let glowSprite = makeGlow(TH.css.rgb);
@@ -816,20 +814,86 @@ const flameSprite = (() => { const c = document.createElement("canvas"); c.width
 // screen, string running away from you into the scene. Throw = push forward (fist moves up-screen and shrinks),
 // bind = yank back toward you (fist drops and grows). The forearm is drawn in strips that get wider toward the
 // bottom edge, so it reads as coming toward the camera.
-const ARM_PINCH = { x: .915, y: .47 };
-const ARM_WRIST = { x: .72, y: .525 };
+// Procedural first-person hand: a right fist seen from behind/above, palm down. Knuckles on the far edge,
+// curled fingers tucked beyond them, the thumb wrapping in from the left, the string pinched between thumb
+// tip and index finger. Painted once per theme into sprites (crisp at 3x), then posed by the rig.
+const HS = 320;                       // sprite resolution: px per hand-width unit
+const H_PINCH = { x: -.37, y: -.95 };  // where the string leaves the hand (hand-width units, wrist at 0,0, fingers toward -y)
+const H_HELD = { x: -.24, y: -1.0 };   // where a held yo-yo sits, tucked under the curled index/middle fingers
 let armParts = null;
+function skinGrad(g, x0, x1, light = 0) {
+  const lg = g.createLinearGradient(x0, 0, x1, 0);
+  lg.addColorStop(0, light ? "#d58e66" : "#a9603f"); lg.addColorStop(.25, "#e8a47a"); lg.addColorStop(.5, "#f3bb90"); lg.addColorStop(.8, "#dc966c"); lg.addColorStop(1, "#a35b3c");
+  return lg;
+}
 function buildArmParts() {
-  if (armParts || !armImg.complete || !armImg.naturalWidth) return armParts;
-  const w = armImg.naturalWidth, h = armImg.naturalHeight, wx = ARM_WRIST.x * w, f = .035 * w;
-  const part = (stops) => { const c = document.createElement("canvas"); c.width = w; c.height = h; const g = c.getContext("2d"); g.drawImage(armImg, 0, 0); g.globalCompositeOperation = "destination-in"; const lg = g.createLinearGradient(0, 0, w, 0); for (const [x, a] of stops) lg.addColorStop(clamp(x / w, 0, 1), `rgba(0,0,0,${a})`); g.fillStyle = lg; g.fillRect(0, 0, w, h); return c; };
-  const fore = part([[0, 1], [wx + f, 1], [wx + 2.2 * f, 0], [w, 0]]), hand = part([[0, 0], [wx - f, 0], [wx, 1], [w, 1]]);
-  for (const c of [fore, hand]) { const g = c.getContext("2d"); g.globalCompositeOperation = "source-atop"; const lg = g.createLinearGradient(0, 0, 0, h * .5);
-    lg.addColorStop(0, rgba(TH.c.beam, .26)); lg.addColorStop(1, rgba(TH.c.beam, 0)); g.fillStyle = lg; g.fillRect(0, 0, w, h); }
-  // bake the perspective taper once: forearm strips get up to 1.5x thicker toward the shoulder (camera) end
-  const foreT = document.createElement("canvas"); foreT.width = w; foreT.height = Math.ceil(h * 1.5); { const g = foreT.getContext("2d"), c = ARM_WRIST.y * h, N = 24, end = wx * 1.1;
-    for (let i = 0; i < N; i++) { const a = end * i / N, b = end * (i + 1) / N, m = 1 + .5 * clamp(1 - ((a + b) / 2) / wx, 0, 1); g.drawImage(fore, a, 0, b - a + .5, h, a, c * 1.5 - c * m, b - a + .5, h * m); } }
-  armParts = { fore: foreT, hand };
+  if (armParts) return armParts;
+  const S = HS, rim = TH.c.beam;
+  // ---- hand sprite: origin (wrist centre) at (1.0S, 1.3S)
+  const hc = document.createElement("canvas"); hc.width = Math.ceil(2 * S); hc.height = Math.ceil(1.5 * S);
+  const g = hc.getContext("2d"); g.translate(S, 1.3 * S); g.scale(S, S); g.lineJoin = "round"; g.lineCap = "round";
+  const knuck = [[-.29, -.79], [-.095, -.84], [.1, -.825], [.285, -.75]];
+  // curled fingers beyond the knuckles (they bend away from you, so they're shorter and a bit darker)
+  knuck.forEach(([x, y], i) => {
+    const w = i === 3 ? .16 : .19, top = y - (i === 3 ? .15 : .19);
+    const lg = g.createLinearGradient(0, top, 0, y + .04); lg.addColorStop(0, "#c27a55"); lg.addColorStop(.5, "#e19d74"); lg.addColorStop(1, "#b06844");
+    g.fillStyle = lg; g.beginPath(); g.roundRect(x - w / 2, top, w, y - top + .06, [w * .5, w * .5, .03, .03]); g.fill();
+    g.strokeStyle = "rgba(120,55,35,.35)"; g.lineWidth = .012; g.stroke();
+    g.fillStyle = "rgba(255,230,210,.35)"; g.beginPath(); g.ellipse(x - w * .12, top + .045, w * .22, .03, 0, 0, TAU); g.fill(); // light on the finger tops
+  });
+  // back of the hand
+  g.beginPath(); g.moveTo(-.31, .2);
+  g.bezierCurveTo(-.33, -.1, -.39, -.4, -.4, -.72);
+  g.quadraticCurveTo(-.395, -.84, -.29, -.835);   // index knuckle
+  g.quadraticCurveTo(-.2, -.9, -.095, -.885);
+  g.quadraticCurveTo(0, -.9, .1, -.87);
+  g.quadraticCurveTo(.2, -.86, .285, -.795);
+  g.quadraticCurveTo(.39, -.74, .4, -.64);
+  g.bezierCurveTo(.41, -.4, .36, -.12, .31, .2); g.closePath();
+  g.fillStyle = skinGrad(g, -.42, .42); g.fill();
+  g.strokeStyle = "rgba(120,55,35,.45)"; g.lineWidth = .014; g.stroke();
+  // knuckle highlights + creases between them
+  knuck.forEach(([x, y]) => { const rg = g.createRadialGradient(x - .02, y - .02, 0, x, y, .1); rg.addColorStop(0, "rgba(255,236,218,.75)"); rg.addColorStop(1, "rgba(255,236,218,0)"); g.fillStyle = rg; g.beginPath(); g.arc(x, y, .1, 0, TAU); g.fill(); });
+  g.strokeStyle = "rgba(150,75,50,.28)"; g.lineWidth = .016;
+  for (let i = 0; i < 3; i++) { const [x0, y0] = knuck[i], [x1, y1] = knuck[i + 1], mx = (x0 + x1) / 2, my = (y0 + y1) / 2; g.beginPath(); g.moveTo(mx, my - .04); g.lineTo(mx + .005, my + .07); g.stroke(); }
+  // tendons fanning from the wrist to each knuckle
+  g.strokeStyle = "rgba(255,232,212,.13)"; g.lineWidth = .02;
+  knuck.forEach(([x, y]) => { g.beginPath(); g.moveTo(x * .35, .05); g.quadraticCurveTo(x * .7, (y + .05) / 2, x, y + .1); g.stroke(); });
+  // soft shading toward the wrist (the hand slopes away from the light)
+  { const lg = g.createLinearGradient(0, -.3, 0, .2); lg.addColorStop(0, "rgba(90,40,25,0)"); lg.addColorStop(1, "rgba(90,40,25,.28)"); g.fillStyle = lg; g.globalCompositeOperation = "source-atop"; g.fillRect(-.45, -.3, .9, .5); g.globalCompositeOperation = "source-over"; }
+  // thumb: one solid, tapered digit wrapping in from the left side of the hand and tucking beside the index finger
+  // (filled shape, wide base merged into the hand, so it never reads as a loop or leaves a see-through gap)
+  const thumb = () => { g.beginPath(); g.moveTo(-.16, -.02);
+    g.bezierCurveTo(-.5, -.12, -.64, -.42, -.53, -.72);      // outer edge
+    g.bezierCurveTo(-.49, -.86, -.42, -.95, -.35, -.92);     // rounded tip
+    g.bezierCurveTo(-.3, -.89, -.3, -.82, -.33, -.76);
+    g.bezierCurveTo(-.38, -.58, -.34, -.36, -.18, -.24);     // inner edge back down into the hand
+    g.closePath(); };
+  thumb(); { const lg = g.createLinearGradient(-.62, 0, -.22, 0); lg.addColorStop(0, "#b36a48"); lg.addColorStop(.5, "#efb388"); lg.addColorStop(1, "#dc9a70"); g.fillStyle = lg; } g.fill();
+  // outline only along the outer edge + tip; soft crease where the thumb meets the hand
+  g.beginPath(); g.moveTo(-.2, -.04); g.bezierCurveTo(-.5, -.12, -.64, -.42, -.53, -.72); g.bezierCurveTo(-.49, -.86, -.42, -.95, -.35, -.92); g.bezierCurveTo(-.3, -.89, -.3, -.82, -.33, -.76);
+  g.strokeStyle = "rgba(120,55,35,.42)"; g.lineWidth = .014; g.stroke();
+  g.beginPath(); g.moveTo(-.33, -.76); g.bezierCurveTo(-.37, -.6, -.35, -.45, -.3, -.36); g.strokeStyle = "rgba(140,65,42,.3)"; g.lineWidth = .02; g.stroke();
+  // top light along the thumb's back
+  g.beginPath(); g.moveTo(-.28, -.12); g.bezierCurveTo(-.5, -.24, -.55, -.5, -.47, -.74); g.strokeStyle = "rgba(255,230,205,.28)"; g.lineWidth = .05; g.lineCap = "round"; g.stroke();
+  // thumbnail, seen from above
+  g.save(); g.translate(-.405, -.86); g.rotate(.55); { const rg = g.createLinearGradient(0, -.05, 0, .05); rg.addColorStop(0, "#ffe9e0"); rg.addColorStop(1, "#f0b9a6"); g.fillStyle = rg; } g.beginPath(); g.ellipse(0, 0, .042, .058, 0, 0, TAU); g.fill();
+  g.strokeStyle = "rgba(160,90,70,.5)"; g.lineWidth = .008; g.stroke(); g.fillStyle = "rgba(255,255,255,.6)"; g.beginPath(); g.ellipse(-.012, -.018, .012, .02, 0, 0, TAU); g.fill(); g.restore();
+  // theme rim light along the far (lit) edge
+  g.globalCompositeOperation = "source-atop"; { const lg = g.createLinearGradient(0, -1.05, 0, -.55); lg.addColorStop(0, rgba(rim, .2)); lg.addColorStop(1, rgba(rim, 0)); g.fillStyle = lg; g.fillRect(-.7, -1.2, 1.4, .7); }
+  // ---- forearm sprite (rises from the bottom edge, wider toward the camera): origin (wrist) at (0.75S, 0.12S)
+  const fc = document.createElement("canvas"); fc.width = Math.ceil(1.5 * S); fc.height = Math.ceil(3.2 * S);
+  const f = fc.getContext("2d"); f.translate(.75 * S, .12 * S); f.scale(S, S);
+  const wAt = (y) => .3 + Math.min(y, 3) * .085;  // half-width grows with distance from the wrist
+  const band = (y0, y1, fill, k = 0) => { f.beginPath(); f.moveTo(-wAt(y0) - k, y0); f.lineTo(wAt(y0) + k, y0); f.lineTo(wAt(y1) + k, y1); f.lineTo(-wAt(y1) - k, y1); f.closePath(); f.fillStyle = fill; f.fill(); };
+  band(-.12, 1.25, skinGrad(f, -.42, .42));
+  { const lg = f.createLinearGradient(0, -.1, 0, 1.25); lg.addColorStop(0, "rgba(90,40,25,.22)"); lg.addColorStop(.3, "rgba(90,40,25,0)"); f.fillStyle = lg; f.globalCompositeOperation = "source-atop"; f.fillRect(-.6, -.12, 1.2, 1.37); f.globalCompositeOperation = "source-over"; }
+  f.strokeStyle = "rgba(255,236,218,.18)"; f.lineWidth = .05; f.beginPath(); f.moveTo(-.08, .1); f.lineTo(-.12, 1.2); f.stroke();
+  { const lg = f.createLinearGradient(-.5, 0, .5, 0); lg.addColorStop(0, "#8c5a14"); lg.addColorStop(.3, "#ffe39a"); lg.addColorStop(.55, "#e7b15a"); lg.addColorStop(1, "#7a4a10"); band(1.22, 1.42, lg, .03); }
+  f.strokeStyle = "rgba(90,55,10,.6)"; f.lineWidth = .012; for (const y of [1.27, 1.37]) { f.beginPath(); f.moveTo(-wAt(y) - .03, y); f.lineTo(wAt(y) + .03, y); f.stroke(); }
+  { const lg = f.createLinearGradient(-.6, 0, .6, 0); lg.addColorStop(0, "#1e1b1c"); lg.addColorStop(.35, "#4a4446"); lg.addColorStop(.6, "#3a3537"); lg.addColorStop(1, "#151314"); band(1.42, 3.05, lg, .06); }
+  f.globalCompositeOperation = "source-atop"; { const lg = f.createLinearGradient(-.6, 0, .2, 0); lg.addColorStop(0, rgba(rim, .22)); lg.addColorStop(1, rgba(rim, 0)); f.fillStyle = lg; f.fillRect(-.7, -.2, .9, 3.3); }
+  armParts = { hand: hc, fore: fc };
   return armParts;
 }
 const rig = { ox: 0, oy: 0, vox: 0, voy: 0, bend: 0, vb: 0, af: -Math.PI / 2 - .3, wind: null, t: 0, droop: 0 };
@@ -882,23 +946,25 @@ function rigEvent(e) {
       break;
   }
 }
-function armGeom() { const iw = armImg.naturalWidth || 1100, ih = armImg.naturalHeight || 389, len = clamp(Math.min(W, H) * 1.05, 330, 520); return { iw, ih, len, th: len * ih / iw }; }
-function drawArm(g, px, py, depthS) {
-  const parts = buildArmParts(); if (!parts) return;
-  const geo = armGeom(), hs = clamp(1 + rig.oy * .0035, .84, 1.16) * clamp(depthS, .6, 1.15);
-  const iw = geo.iw, ih = geo.ih, len = geo.len * hs, th = geo.th * hs;
-  const wx = ARM_WRIST.x * len, wy = ARM_WRIST.y * th, dx = (ARM_PINCH.x - ARM_WRIST.x) * len, dy = (ARM_PINCH.y - ARM_WRIST.y) * th;
-  // shoulder off-screen below and to the right; the forearm rises up-left toward the fist
-  const dir0 = -Math.PI / 2 - .3, D = geo.len * 1.25, ax = W / 2 - D * Math.cos(dir0) + W * .06, ay = P.Yh - D * Math.sin(dir0);
-  let af = rig.af, ah = af + rig.bend * .6, wX = px, wY = py;
-  for (let i = 0; i < 3; i++) { const c = Math.cos(ah), s = Math.sin(ah); wX = px - (c * dx - s * dy); wY = py - (s * dx + c * dy); af = Math.atan2(wY - ay, wX - ax); ah = af + rig.bend * .6; }
-  rig.af = af;
-  const k = len / iw, pd = parts.pad * k;
-  // (no cast shadow in first person: the floor is far below the arm, so the arm reads cleaner without one)
-  g.save(); g.translate(wX, wY); g.rotate(af);
-  g.drawImage(parts.fore, 1, 0, 4, parts.fore.height, -wx - 900 + 3, -wy * 1.5, 900, th * 1.5); // sleeve continues off the bottom edge
-  g.drawImage(parts.fore, -wx, -wy * 1.5, len, th * 1.5); g.restore();
-  g.save(); g.translate(wX, wY); g.rotate(ah); g.drawImage(parts.hand, -wx, -wy, len, th); g.restore();
+function handW() { return clamp(Math.min(W, H) * .3, 105, 175); }
+function armGeom() { return { len: handW() }; }
+// solve the pose: pinch on the string point, forearm aimed from a shoulder pivot off-screen bottom-right
+const pose = { wX: 0, wY: 0, af: 0, th: 0, hw: 0, fs: 1 };
+function solveArm(px, py, depthS) {
+  const hs = clamp(1 + rig.oy * .0035, .84, 1.16) * clamp(depthS, .6, 1.15), hw = handW() * hs;
+  const fs = 1 - clamp(rig.bend, 0, 1) * .28 + clamp(-rig.bend, 0, 1) * .08; // wrist flick foreshortens the fist
+  const dir0 = -Math.PI / 2 - .3, D = handW() * 4.4, ax = W / 2 - D * Math.cos(dir0) + W * .1, ay = P.Yh - D * Math.sin(dir0);
+  let af = rig.af, wX = px, wY = py;
+  for (let i = 0; i < 3; i++) { const th = af + Math.PI / 2 + rig.bend * .35, c = Math.cos(th), s = Math.sin(th), lx = H_PINCH.x * hw, ly = H_PINCH.y * hw * fs;
+    wX = px - (c * lx - s * ly); wY = py - (s * lx + c * ly); af = Math.atan2(wY - ay, wX - ax); }
+  rig.af = af; Object.assign(pose, { wX, wY, af, th: af + Math.PI / 2 + rig.bend * .35, hw, fs });
+  return pose;
+}
+function handPoint(lx, ly) { const c = Math.cos(pose.th), s = Math.sin(pose.th), x = lx * pose.hw, y = ly * pose.hw * pose.fs; return { x: pose.wX + c * x - s * y, y: pose.wY + s * x + c * y }; }
+function drawArm(g) {
+  const parts = buildArmParts(), k = pose.hw / HS;
+  g.save(); g.translate(pose.wX, pose.wY); g.rotate(pose.af + Math.PI / 2); g.drawImage(parts.fore, -.75 * HS * k, -.12 * HS * k, parts.fore.width * k, parts.fore.height * k); g.restore();
+  g.save(); g.translate(pose.wX, pose.wY); g.rotate(pose.th); g.scale(1, pose.fs); g.drawImage(parts.hand, -HS * k, -1.3 * HS * k, parts.hand.width * k, parts.hand.height * k); g.restore();
 }
 
 /* ================= Yo-yo art (procedural, one look per model) ================= */
@@ -1044,6 +1110,54 @@ function drawParticles(g, list) {
   }
   g.globalAlpha = 1; g.globalCompositeOperation = "source-over";
 }
+
+/* ================= Dynamic camera =================
+   A spring-driven 2D camera over the projected scene (the DOM HUD is never touched):
+   held -> hand framing, throw -> push in and track the yo-yo with a little lead (the hand may slide off the bottom),
+   sleep / Walk the Dog -> ease out to a wide shot of yo-yo + floor + string + hand (held for a beat),
+   swings -> moderate framing around the hand and arc, bind/return -> push back in and follow it home.
+   Zoom stays >= 1 and the view is clamped inside the backdrop, so no edges ever show. */
+const cam = { x: 0, y: 0, z: 1, vx: 0, vy: 0, vz: 0, wideHold: 0, mode: "neutral", init: false };
+function camTarget(dt) {
+  if (!playing) { cam.mode = "neutral"; return { x: W / 2, y: H / 2, z: 1 }; }
+  const yq = proj(S.yo.x, S.yo.y), hq = proj(S.hand.x, S.hand.y), red = S.reduced ? .3 : 1;
+  let x = W / 2, y = H / 2, z = 1, mode = S.phase;
+  const floorTrick = S.onFloor || (S.phase === "sleep" && S.hand.y > S.handBaseY + 30 && S.floorY - (S.yo.y + S.R) < S.R * 1.5);
+  if (floorTrick) cam.wideHold = .9; else cam.wideHold = Math.max(0, cam.wideHold - dt);
+  if (S.phase === "held") { mode = "hand"; x = W / 2; y = lerp(H / 2, P.Yh, .32); z = 1.1; }
+  else if (S.phase === "out") {
+    mode = "follow"; const lq = proj(S.yo.x + S.yo.vx * .12, S.yo.y + S.yo.vy * .12);
+    x = lerp(hq.x, lq.x, .68); y = lerp(hq.y, lq.y, .78); z = 1.32;
+  } else if (S.phase === "return") { mode = "return"; x = lerp(yq.x, hq.x, .4); y = lerp(yq.y, hq.y, .4); z = 1.2; }
+  else if (cam.wideHold > 0) { mode = "wide"; x = W / 2; y = H / 2; z = 1; }
+  else { // sleep / dead / swings: frame the hand, the yo-yo, the floor under it and the string between
+    const fq = proj(S.yo.x, S.floorY), R = S.R * P.VS;
+    const x0 = Math.min(yq.x, hq.x, fq.x) - R * 2, x1 = Math.max(yq.x, hq.x, fq.x) + R * 2, y0 = Math.min(yq.y, fq.y) - R * 2, y1 = hq.y + handW() * .9;
+    const swing = Math.abs(S.yo.vx) > 260 * S.scale || S.yo.y < S.hand.y + S.L * .55;
+    mode = swing ? "swing" : "frame";
+    z = clamp(Math.min(W / (x1 - x0 + 40), (H * .72) / (y1 - y0 + 40)), 1, swing ? 1.07 : 1.16);
+    x = (x0 + x1) / 2; y = (y0 + y1) / 2 + H * .05; // bottom HUD is taller, so sit the shot a touch high
+  }
+  cam.mode = mode;
+  return { x, y, z: 1 + (z - 1) * red };
+}
+function camClamp() { const z = Math.max(1, cam.z); cam.x = clamp(cam.x, W / 2 / z, W - W / 2 / z); cam.y = clamp(cam.y, H / 2 / z, H - H / 2 / z); }
+function camUpdate(dt) {
+  const t = camTarget(dt);
+  if (!cam.init) { Object.assign(cam, { x: t.x, y: t.y, z: t.z, vx: 0, vy: 0, vz: 0, init: true }); camClamp(); return; }
+  const w = S.reduced ? 3.2 : (cam.mode === "follow" ? 7 : cam.mode === "wide" ? 3.4 : 4.6), wz = S.reduced ? 2.6 : (cam.mode === "wide" ? 2.8 : cam.mode === "follow" ? 7.5 : 4.2), zeta = .92;
+  let n = Math.max(1, Math.ceil(dt / (1 / 240))); const h = dt / n;
+  while (n-- > 0) {
+    cam.vx += (w * w * (t.x - cam.x) - 2 * zeta * w * cam.vx) * h; cam.vy += (w * w * (t.y - cam.y) - 2 * zeta * w * cam.vy) * h;
+    cam.vz += (wz * wz * (t.z - cam.z) - 2 * zeta * wz * cam.vz) * h;
+    cam.x += cam.vx * h; cam.y += cam.vy * h; cam.z += cam.vz * h;
+  }
+  cam.z = clamp(cam.z, 1, 1.4); camClamp();
+  // keep a hovering mouse cursor glued to the hand while the camera pans/zooms
+  if (playing && inp.mcx != null && !tilt.live && (!drag || drag.mouse)) inp.x = camInvX(inp.mcx);
+}
+// screen -> scene x (mouse hover follows the cursor even while the camera is zoomed/panned)
+function camInvX(clientX) { const r = cv.getBoundingClientRect(); return (clientX - r.left - W / 2) / cam.z + cam.x; }
 let frameDtVis = 1 / 60;
 let fogSprite = null, fogFor = "";
 function ensureFog() { if (fogFor === TH.c.fog) return; fogFor = TH.c.fog; const c = document.createElement("canvas"); c.width = c.height = 64; const g = c.getContext("2d"); const r = g.createRadialGradient(32, 32, 10, 32, 32, 32); r.addColorStop(0, rgba(TH.c.fog, 0)); r.addColorStop(.5, rgba(TH.c.fog, .55)); r.addColorStop(1, rgba(TH.c.fog, 0)); g.fillStyle = r; g.fillRect(0, 0, 64, 64); fogSprite = c; }
@@ -1067,6 +1181,7 @@ function render(alpha) {
   const ox = W / 2, oy = P.hy + (P.Yh - P.hy) * .4;
   if (pz > 1.001 || sx || sy) { g.fillStyle = "#000"; g.fillRect(0, 0, cv.width, cv.height); }
   g.setTransform(DPR * pz, 0, 0, DPR * pz, DPR * (ox - ox * pz + sx * .5), DPR * (oy - oy * pz + sy * .5));
+  g.translate(W / 2, H / 2); g.scale(cam.z, cam.z); g.translate(-cam.x, -cam.y); // dynamic camera
   g.drawImage(bg, 0, 0, W, H);
   const t = S.time;
   drawLive(g, t);
@@ -1075,8 +1190,9 @@ function render(alpha) {
   const ang = lerp(S.pAngle, S.angle, alpha), m = S.cfg, hot = clamp((S.spin - 30) / 50, 0, 1);
   const hq = proj(hxW, hyW), held = S.phase === "held" && playing;
   const pX = hq.x + (playing ? rig.ox : 0), pY = hq.y + (playing ? rig.oy : 0);
+  if (playing) solveArm(pX, pY, hq.s);
   let q = proj(yxW, yyW);
-  if (held) q = { x: pX, y: pY - (P.Yh - P.Yy0) * clamp(1 + rig.oy * .0035, .84, 1.16), s: 1, z: 1, u: 0 };
+  if (held) { const hp = handPoint(H_HELD.x, H_HELD.y); q = { x: hp.x, y: hp.y, s: 1, z: 1, u: 0 }; }
   const R = S.R * P.VS * q.s;
   // contact shadow on the floor: grows darker and sharper as the yo-yo nears it
   const gap = clamp((S.floorY - (yyW + S.R)) / Math.max(80, (S.floorY - S.handBaseY) * .7), 0, 1);
@@ -1092,7 +1208,7 @@ function render(alpha) {
     drawYoyoDepth(g, q, R, m, ang, S.reduced ? 0 : S.rollDir * S.spin * .5, hot, t);
   };
   if (!nearer) { if (playing || S.attract) drawString(g, pX, pY, q.x, q.y + R * .1, Math.min(60, slack), S.tension, S.tangled, t, S.R * .35); drawYo(); }
-  if (playing) drawArm(g, pX, pY, hq.s);
+  if (playing) drawArm(g);
   if (nearer) { drawString(g, pX, pY, q.x, q.y, Math.min(60, slack), S.tension, S.tangled, t, S.R * .35); drawYo(); }
   drawParticles(g, projParticles(S.particles));
   g.textAlign = "center"; g.textBaseline = "middle"; g.lineJoin = "round";
@@ -1112,14 +1228,15 @@ cv.addEventListener("pointerdown", (e) => {
 });
 cv.addEventListener("pointermove", (e) => {
   if (!playing) return;
-  if (!drag) { if (e.pointerType === "mouse" && !tilt.live) inp.x = e.clientX; return; } // desktop: hand follows the cursor
+  if (!drag) { if (e.pointerType === "mouse" && !tilt.live) { inp.mcx = e.clientX; inp.x = camInvX(e.clientX); } return; } // desktop: hand follows the cursor
   if (e.pointerId !== drag.id) return;
   const evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
   for (const ev of evs) drag.samples.push({ t: ev.timeStamp || performance.now(), x: ev.clientX, y: ev.clientY });
   const now = performance.now(); while (drag.samples.length > 2 && now - drag.samples[0].t > 120) drag.samples.shift();
   const dx = e.clientX - drag.sx, dy = e.clientY - drag.sy; drag.moved = Math.max(drag.moved, Math.hypot(dx, dy));
   // relative drag (no jump to the finger) — mouse uses absolute since the cursor is the hand
-  inp.x = drag.mouse ? e.clientX : drag.ox + dx;
+  inp.mcx = drag.mouse ? e.clientX : null; // touch drags are relative, so the camera never fights them
+  inp.x = drag.mouse ? camInvX(e.clientX) : drag.ox + dx;
   inp.y = drag.oy - dy * .9; // first-person: pushing your finger up reaches forward/down toward the floor
 });
 function endDrag(e) {
@@ -1468,6 +1585,7 @@ function tick(dt) {
   emitTrails(dt);
   stepFx(S, dt);
   if (playing) rigUpdate(dt);
+  camUpdate(dt);
   render(clamp(acc / DT, 0, 1));
   if (!playing && !menuEl.classList.contains("hidden")) { heroAng += dt * (YOYOS[viewIdx].special ? 1.1 : .7); drawHero(); }
   stepCelebrate(dt);
@@ -1492,7 +1610,7 @@ raf = requestAnimationFrame(frame);
 // test / debug hooks (read-only views + input driving; nothing here bypasses unlocks)
 window.__yo = {
   state: () => ({ phase: S.phase, playing, attract: S.attract, model: S.cfg.id, selected: store.d.selected, theme: store.d.theme, R: Math.round(S.R), L: Math.round(S.L), Lmax: Math.round(S.Lmax), spin: Math.round(S.spin), score: S.score, combo: S.combo, tricks: [...S.scored], hand: [Math.round(S.hand.x), Math.round(S.hand.y)], yo: [Math.round(S.yo.x), Math.round(S.yo.y)], onFloor: S.onFloor, tangled: S.tangled, dpr: DPR, canvas: [cv.width, cv.height], level: store.d.level, xp: store.d.xp, coins: store.d.coins, diamond: unlocked("diamond"), unlocked: YOYOS.filter((y) => unlocked(y.id)).map((y) => y.id), particles: S.particles.length }),
-  sim: S, rig,
+  sim: S, rig, cam,
   manual: (on) => { manualClock = !!on; prevT = performance.now(); },
   advance: (frames = 1, fps = 60) => { for (let i = 0; i < frames; i++) tick(1 / fps); },
   drive: (x, y) => { inp.x = x; if (y != null) inp.y = y; inp.touching = true; },
