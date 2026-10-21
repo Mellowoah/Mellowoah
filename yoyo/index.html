@@ -181,6 +181,25 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline
 .rmsg{min-height:20px;margin-top:6px;font-size:13px;font-weight:600;color:var(--muted)}
 .rmsg.err{color:#ff8f78}.rmsg.ok{color:#8ff5ff}
 .sheet .done{width:100%;margin-top:14px;height:58px;font-size:24px}
+.sr-only{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;min-height:0;padding:0}
+.tricks{align-items:center;gap:4px;max-width:100%}
+.tricks .t{padding:0 6px;letter-spacing:.03em;flex:0 1 auto;min-width:0}
+@media (max-width:400px){.tricks .t{padding:0 5px;font-size:10px;letter-spacing:.02em}}
+.tricks .t{pointer-events:auto;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.tricks .t.tip{outline:1.5px solid var(--accent);outline-offset:1px}
+.info-btn{pointer-events:auto;flex:none;width:24px;height:24px;margin-left:3px;border-radius:50%;display:inline-grid;place-items:center;font:800 13px/1 Georgia,"Times New Roman",serif;font-style:italic;color:var(--ink);background:linear-gradient(180deg,var(--accent-hi),var(--accent-lo));box-shadow:0 2px 6px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.5);-webkit-tap-highlight-color:transparent;position:relative}
+.info-btn::after{content:"";position:absolute;inset:-9px;border-radius:50%}
+.info-btn.open{box-shadow:0 0 0 2px rgba(var(--accent-rgb),.45),0 2px 6px rgba(0,0,0,.45)}
+.info-btn.pulse{animation:infoPulse 1.6s var(--ease) 4}
+@keyframes infoPulse{0%,100%{box-shadow:0 2px 6px rgba(0,0,0,.45),0 0 0 0 rgba(var(--accent-rgb),.75)}60%{box-shadow:0 2px 6px rgba(0,0,0,.45),0 0 0 11px rgba(var(--accent-rgb),0)}}
+.info-pop{position:absolute;left:50%;bottom:calc(100% + 4px);transform:translate(-50%,6px) scale(.97);transform-origin:50% 100%;width:min(320px,calc(100% - 24px));padding:11px 34px 12px 14px;border-radius:16px;opacity:0;pointer-events:none;transition:opacity .2s var(--ease),transform .25s var(--spring);z-index:40;text-align:left}
+.info-pop[hidden]{display:block;visibility:hidden}
+.info-pop.on{opacity:1;transform:translate(-50%,0) scale(1);pointer-events:auto;visibility:visible}
+.info-pop::after{content:"";position:absolute;left:var(--tail,50%);bottom:-6px;width:12px;height:12px;margin-left:-6px;transform:rotate(45deg);background:var(--panel);box-shadow:1px 1px 0 rgba(var(--accent-rgb),.55)}
+.info-ttl{font-family:var(--game);font-size:14px;letter-spacing:.04em;color:var(--accent-hi);margin-bottom:3px}
+.info-txt{font-size:13.5px;font-weight:600;line-height:1.38;color:#fff;text-wrap:pretty}
+.info-x{position:absolute;top:5px;right:5px;width:26px;height:26px;border-radius:50%;font-size:19px;line-height:1;color:rgba(255,255,255,.75);background:rgba(0,0,0,.25);display:grid;place-items:center}
+.info-x:active{transform:scale(.92)}
 .note{position:absolute;left:50%;bottom:calc(var(--sab) + 205px);transform:translate(-50%,10px);opacity:0;max-width:88%;padding:10px 16px;font-size:13.5px;font-weight:600;color:#fff;transition:all .35s var(--ease);pointer-events:none;text-align:center;z-index:30}
 .note.on{opacity:1;transform:translate(-50%,0)}
 .celebrate{position:absolute;inset:0;display:grid;place-items:center;pointer-events:none;z-index:61;opacity:0}
@@ -228,7 +247,12 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline
     </div>
     <div class="toast" id="toast"><div class="n"></div><div class="p"></div></div>
     <div class="bottombar">
-      <div class="hint" id="hint"></div>
+      <div class="hint sr-only" id="hint"></div>
+      <div class="info-pop frame" id="infoPop" role="dialog" aria-modal="false" aria-labelledby="infoTtl" hidden>
+        <button class="info-x" id="infoX" aria-label="Close tip">&times;</button>
+        <div class="info-ttl" id="infoTtl">Tip</div>
+        <div class="info-txt" id="infoTxt"></div>
+      </div>
       <div class="tricks" id="tricks" aria-label="Tricks this throw"></div>
       <div class="tray frame">
         <div class="gauge" aria-label="Spin">
@@ -1258,10 +1282,91 @@ function projParticles(list) { // world particles -> screen, sized by depth
     out[i] = { kind: p.kind, x: q.x, y: q.y, vx: p.vx * q.s, vy: -p.vy * q.s, life: p.life, max: p.max, size: p.size * m, rot: p.rot, col: p.col }; }
   return out;
 }
+/* ---- edge-on yo-yo (top-down view of a hanging / spinning yo-yo) ----
+   Seen from straight above, a yo-yo on the string shows its rims: two domed halves side by side along the axle,
+   a dark gap between them with the wound string, and the string dropping into the middle of the gap.
+   Local frame: x = axle, y = diameter (the direction it rolls / travels). Spin is shown by rim features
+   (cap-colour marks) travelling over the visible top of each rim: a feature at angle a sits at y = R·sin(a) and
+   is visible while cos(a) > 0; fast spin smears them into streaks. */
+function drawYoyoEdge(g, x, y, R, m, phi, ang, omega, alpha = 1, t = 0) {
+  const L = m.look, st = m.rimStyle, hw = R * (st === "tyre" ? .8 : st === "thin" ? .6 : st === "silver" ? .66 : .7), gap = R * .12, th = hw - gap;
+  const fast = Math.abs(omega) > 14, ring = st === "tyre" ? "#16110d" : L.mid;
+  g.save(); g.globalAlpha = alpha; g.translate(x, y); g.rotate(phi);
+  // gap + wound string + axle
+  g.fillStyle = "#0b0705"; g.beginPath(); g.roundRect(-gap - 1, -R * .9, gap * 2 + 2, R * 1.8, gap); g.fill();
+  { const lg = g.createLinearGradient(-gap, 0, gap, 0); lg.addColorStop(0, "#9c917e"); lg.addColorStop(.5, "#fff8ea"); lg.addColorStop(1, "#8a7f6c"); g.fillStyle = lg; g.beginPath(); g.roundRect(-gap * .72, -R * .4, gap * 1.44, R * .8, gap * .5); g.fill(); }
+  for (const side of [-1, 1]) {
+    const x0 = side < 0 ? -hw : gap, ro = Math.min(th * .62, R * .5), ri = th * .18;
+    const rad = side < 0 ? [ro, ri, ri, ro] : [ri, ro, ro, ri];
+    // silhouette of one half seen edge-on: flat inner face at the gap, rounded rim corners, outer face bulging (domed)
+    const body = () => { const X = (u) => side * (gap + th * u); g.beginPath(); g.moveTo(X(0), -R * .97); g.quadraticCurveTo(X(0), -R, X(.3), -R);
+      g.lineTo(X(.62), -R * .99); g.quadraticCurveTo(X(1), -R * .97, X(1), -R * .6); g.bezierCurveTo(X(1.07), -R * .25, X(1.07), R * .25, X(1), R * .6);
+      g.quadraticCurveTo(X(1), R * .97, X(.62), R * .99); g.lineTo(X(.3), R); g.quadraticCurveTo(X(0), R, X(0), R * .97); g.closePath(); };
+    // cylinder shading along the diameter (rim curves away from the lens at both ends), light from up-left
+    let lg = g.createLinearGradient(0, -R, 0, R);
+    const hi = st === "tyre" ? "#4a4038" : st === "silver" ? "#ffffff" : L.hi, md = st === "tyre" ? "#221b16" : st === "silver" ? "#b9d6ee" : st === "scallop" ? L.mid : ring, dp = st === "tyre" ? "#070504" : L.deep;
+    lg.addColorStop(0, dp); lg.addColorStop(.28, md); lg.addColorStop(.42, hi); lg.addColorStop(.62, md); lg.addColorStop(1, dp);
+    body(); g.fillStyle = lg; g.fill();
+    g.save(); body(); g.clip();
+    // design details on the rim surface
+    if (st === "tyre") { // body colour shows on the inner lip, rubber tread on the outside
+      g.fillStyle = L.mid; g.globalAlpha = alpha * .85; g.fillRect(side < 0 ? x0 + th * .74 : x0, -R, th * .26, R * 2); g.globalAlpha = alpha;
+      g.strokeStyle = "rgba(255,255,255,.12)"; g.lineWidth = R * .045; for (let k = 0; k < 14; k++) { const a = ang + k * TAU / 14, c = Math.cos(a); if (c <= 0) continue; const yy = R * Math.sin(a); g.globalAlpha = alpha * c; g.beginPath(); g.moveTo(x0 + th * (side < 0 ? .08 : .26), yy); g.lineTo(x0 + th * (side < 0 ? .74 : .92), yy); g.stroke(); } g.globalAlpha = alpha;
+    } else if (st === "step") { g.strokeStyle = "rgba(255,248,220,.75)"; g.lineWidth = R * .035; const sx = x0 + th * (side < 0 ? .45 : .55); g.beginPath(); g.moveTo(sx, -R); g.lineTo(sx, R); g.stroke(); g.strokeStyle = "rgba(90,58,16,.5)"; g.lineWidth = R * .02; g.beginPath(); g.moveTo(sx + R * .03, -R); g.lineTo(sx + R * .03, R); g.stroke(); }
+    else if (st === "scallop") { // petals: pastel segments passing over the rim as it spins
+      const cols = [L.hi, L.mid, L.accent, "#ffd6ea", L.hi]; for (let k = 0; k < 10; k++) { const a = ang + k * TAU / 10, c = Math.cos(a); if (c <= .05) continue; const yy = R * Math.sin(a), h = R * .34 * c;
+        g.fillStyle = cols[k % cols.length]; g.globalAlpha = alpha * (.55 + .45 * c); g.beginPath(); g.ellipse(x0 + th / 2, yy, th * .52, h * .55, 0, 0, TAU); g.fill(); } g.globalAlpha = alpha;
+      g.strokeStyle = "rgba(200,120,170,.5)"; g.lineWidth = R * .02; g.beginPath(); g.moveTo(x0 + th / 2, -R); g.lineTo(x0 + th / 2, R); g.stroke(); }
+    else if (st === "silver") { // faceted crystal: bands of light and dark facets rolling over the rim
+      for (let k = 0; k < 12; k++) { const a = ang + k * TAU / 12, c = Math.cos(a); if (c <= 0) continue; const y0 = R * Math.sin(a), y1 = R * Math.sin(a + TAU / 12);
+        g.fillStyle = k % 2 ? `rgba(255,255,255,${.5 * c})` : `rgba(40,100,170,${.35 * c})`; g.beginPath(); g.moveTo(x0, y0); g.lineTo(x0 + th, y0 + (y1 - y0) * .3); g.lineTo(x0 + th, y1); g.lineTo(x0, y1 - (y1 - y0) * .3); g.closePath(); g.fill(); } }
+    else if (m.finish === "wood") { g.strokeStyle = "rgba(90,50,20,.35)"; g.lineWidth = R * .02; for (let k = 1; k < 4; k++) { const xx = x0 + th * k / 4; g.beginPath(); g.moveTo(xx, -R); g.bezierCurveTo(xx + R * .04, -R * .3, xx - R * .04, R * .3, xx, R); g.stroke(); } }
+    else if (m.finish === "pearl") { const pg = g.createLinearGradient(x0, 0, x0 + th, 0); pg.addColorStop(0, "rgba(255,210,235,.35)"); pg.addColorStop(.5, "rgba(210,235,255,.3)"); pg.addColorStop(1, "rgba(255,255,255,.2)"); g.fillStyle = pg; g.fillRect(x0, -R, th, R * 2); }
+    // dome across the thickness: outer edge rolls away, inner edge shadowed by the gap
+    lg = g.createLinearGradient(x0, 0, x0 + th, 0);
+    const o = side < 0 ? 0 : 1; lg.addColorStop(o, "rgba(0,0,0,.42)"); lg.addColorStop(.5, "rgba(0,0,0,0)"); lg.addColorStop(.62, "rgba(255,255,255,.12)"); lg.addColorStop(1 - o, "rgba(0,0,0,.5)");
+    g.fillStyle = lg; g.fillRect(x0, -R, th, R * 2);
+    // spin: rim marks travel along the diameter over the visible top of the rim (streaks when fast)
+    if (st !== "silver" && st !== "scallop") { const n = 6, col = st === "neon" ? L.rim : L.accent;
+      for (let k = 0; k < n; k++) { const a = ang + k * TAU / n + (side > 0 ? TAU / 12 : 0), c = Math.cos(a); if (c <= .05) continue; const yy = R * Math.sin(a), len = R * (fast ? .5 : .14) * c;
+        g.globalAlpha = alpha * c * (fast ? .45 : .9); g.fillStyle = col; g.beginPath(); g.roundRect(x0 + th * .3, yy - len / 2, th * .4, len, th * .2); g.fill(); } g.globalAlpha = alpha; }
+    if (fast) { g.globalCompositeOperation = "lighter"; g.globalAlpha = alpha * .18; g.fillStyle = "#fff"; const sy = R * .55 * Math.sin(t * 9 + side); g.fillRect(x0 + th * .2, sy - R * .08, th * .6, R * .16); g.globalAlpha = alpha; g.globalCompositeOperation = "source-over"; }
+    g.restore();
+    body(); g.lineWidth = Math.max(1, R * .03); g.strokeStyle = st === "neon" ? L.rim : st === "scallop" ? "rgba(200,120,170,.6)" : "rgba(0,0,0,.55)"; g.stroke();
+    if (st === "neon") { g.globalCompositeOperation = "lighter"; g.strokeStyle = L.rim; g.globalAlpha = alpha * .35; g.lineWidth = R * .14; body(); g.stroke(); g.globalAlpha = alpha; g.globalCompositeOperation = "source-over"; }
+  }
+  if (st === "silver") { g.globalCompositeOperation = "lighter"; for (let i = 0; i < 3; i++) { const k = Math.max(0, Math.sin(t * (2.3 + i * .9) + i * 2.1)); if (k > .35) star4(g, (i - 1) * hw * .62, Math.sin(t * 1.3 + i * 2) * R * .6, R * .22 * k, .95); } g.globalCompositeOperation = "source-over"; }
+  g.restore();
+}
+// face-up (in the palm) <-> edge-on (hanging) morph: the disc tips over its diameter as it leaves the hand
+const yoView = { e: 0, ve: 0, phi: 0, vphi: 0, slow: 0 };
+function yoViewUpdate(dt) {
+  const arriving = S.phase === "return" && S.yo.y - S.hand.y < S.Lmin * 3.2;
+  const te = playing && !S.attract && (S.phase === "held" || S.pendingThrow || arriving) ? 0 : 1;
+  const we = S.reduced ? 9 : te ? 16 : 14;
+  // orientation: diameter follows the screen direction of travel in swings / Walk the Dog; a straight drop keeps the axle left-right
+  const q = proj(S.yo.x, S.yo.y), q2 = proj(S.yo.x + S.yo.vx * .05, S.yo.y + S.yo.vy * .05), vx = (q2.x - q.x) / .05, vy = (q2.y - q.y) / .05, sp = Math.hypot(vx, vy);
+  const lateral = S.phase !== "out" && S.phase !== "held" && (sp > 90 * S.scale || (S.onFloor && Math.abs(S.yo.vx) > 25));
+  if (lateral) yoView.slow = 0; else yoView.slow += dt;
+  let tp = yoView.tphi == null ? Math.PI / 2 : yoView.tphi;
+  if (lateral) tp = Math.atan2(vy, vx) - Math.PI / 2; else if (yoView.slow > .45 || S.phase === "out" || S.phase === "held") tp = 0;
+  tp += Math.PI * Math.round((yoView.phi - tp) / Math.PI); yoView.tphi = tp; // a yo-yo is symmetric: take the nearest equivalent angle
+  const wp = S.reduced ? 5 : 9; let n = Math.max(1, Math.ceil(dt / (1 / 240))); const h = dt / n;
+  while (n-- > 0) { yoView.ve += (we * we * (te - yoView.e) - 2 * .9 * we * yoView.ve) * h; yoView.e += yoView.ve * h; yoView.vphi += (wp * wp * (tp - yoView.phi) - 2 * .95 * wp * yoView.vphi) * h; yoView.phi += yoView.vphi * h; }
+  yoView.e = clamp(yoView.e, 0, 1);
+}
+function drawYoyoTop(g, q, R, m, ang, omega, hot, t, alpha = 1) {
+  const e = yoView.e, phi = yoView.phi;
+  if (e > .985) { drawYoyoEdge(g, q.x, q.y, R, m, phi, ang, omega, alpha, t); return; }
+  if (e < .015) { drawYoyo(g, q.x, q.y, R, m, ang, omega, frameDtVis, hot, alpha, t); return; }
+  const a = e * Math.PI / 2, c = Math.cos(a), s2 = Math.sin(a);
+  g.save(); g.translate(q.x, q.y); g.rotate(phi); g.scale(Math.max(.04, s2), 1); drawYoyoEdge(g, 0, 0, R, m, 0, ang, omega, alpha, t); g.restore();
+  g.save(); g.translate(q.x, q.y); g.rotate(phi); g.translate(R * .7 * s2 * .5, 0); g.scale(Math.max(.04, c), 1); g.rotate(-phi); drawYoyo(g, 0, 0, R, m, ang, omega, frameDtVis, hot, alpha * clamp((1 - e) / .45, 0, 1), t); g.restore();
+}
 function drawYoyoDepth(g, q, R, m, ang, omega, hot, t) { // seen from above: face/rim art, a touch dimmer as it drops away from the light
-  drawYoyo(g, q.x, q.y, R, m, ang, omega, frameDtVis, hot, 1, t);
+  drawYoyoTop(g, q, R, m, ang, omega, hot, t);
   const dim = clamp((1 - q.s) * .32, 0, .22);
-  if (dim > .01) { g.globalAlpha = dim; g.fillStyle = "#000"; g.beginPath(); g.arc(q.x, q.y, R * 1.02, 0, TAU); g.fill(); g.globalAlpha = 1; }
+  if (dim > .01 && yoView.e < .5) { g.globalAlpha = dim; g.fillStyle = "#000"; g.beginPath(); g.arc(q.x, q.y, R * 1.02, 0, TAU); g.fill(); g.globalAlpha = 1; }
 }
 function render(alpha) {
   const g = ctx; g.setTransform(1, 0, 0, 1, 0, 0);
@@ -1293,15 +1398,16 @@ function render(alpha) {
   // contact shadow straight below on the floor: darker and sharper as the yo-yo nears it
   const gap = clamp((S.floorY - (yyW + S.R)) / Math.max(80, (S.floorY - S.handBaseY) * .7), 0, 1);
   if (!held || !playing) { const hh = Math.max(0, S.floorY - yyW - S.R), f = fproj(yxW + hh * .12, P.Ay + hh * .16), sr = S.R * P.VS * P.sf * (1.05 + gap * 1.1), a = .6 * (1 - gap * .7);
-    const rg = g.createRadialGradient(f.x, f.y, 0, f.x, f.y, sr); rg.addColorStop(0, `rgba(0,0,0,${a})`); rg.addColorStop(clamp(.78 - gap * .6, .15, .78), `rgba(0,0,0,${a * .75})`); rg.addColorStop(1, "rgba(0,0,0,0)");
-    g.fillStyle = rg; g.beginPath(); g.arc(f.x, f.y, sr, 0, TAU); g.fill(); }
+    const rg = g.createRadialGradient(0, 0, 0, 0, 0, sr); rg.addColorStop(0, `rgba(0,0,0,${a})`); rg.addColorStop(clamp(.78 - gap * .6, .15, .78), `rgba(0,0,0,${a * .75})`); rg.addColorStop(1, "rgba(0,0,0,0)");
+    // capsule-shaped when edge-on: narrow along the axle, long along the diameter
+    g.save(); g.translate(f.x, f.y); g.rotate(yoView.phi); g.scale(lerp(1, .78, yoView.e), 1); g.fillStyle = rg; g.beginPath(); g.roundRect(-sr, -sr, sr * 2, sr * 2, sr * lerp(1, .62, yoView.e)); g.fill(); g.restore(); }
   if (hot > 0 || S.attract) { const gr = R * (2.6 + hot * 1.4); g.globalCompositeOperation = "lighter"; g.globalAlpha = .16 + hot * .28; g.drawImage(glowSprite, q.x - gr, q.y - gr, gr * 2, gr * 2); g.globalAlpha = 1; g.globalCompositeOperation = "source-over"; }
   // string from the fingers down to the axle: seen nearly end-on, so it's a short line
   const dW = Math.hypot(yxW - hxW, yyW - hyW), slack = held ? 0 : Math.sqrt(Math.max(0, S.L * S.L - dW * dW)) * .2 * (hq.s + q.s) * .5;
   const nearer = held || (q.u < -.02) || (rig.rot < .5 && (S.phase === "out" || S.phase === "return") && Math.abs(yyW - hyW) < S.Lmin * 2.2); // in the palm / above the hand -> in front of the fist
   const drawYo = () => {
     const sp = Math.hypot(S.yo.vx, S.yo.vy);
-    if (sp > 520 * S.scale && !held && !S.reduced) for (let i = 3; i >= 1; i--) { const gq = proj(yxW - S.yo.vx * .009 * i, yyW - S.yo.vy * .009 * i); drawYoyo(g, gq.x, gq.y, S.R * P.VS * gq.s * (1 - i * .03), m, ang, 0, 0, 0, .09, t); }
+    if (sp > 520 * S.scale && !held && !S.reduced) for (let i = 3; i >= 1; i--) { const gq = proj(yxW - S.yo.vx * .009 * i, yyW - S.yo.vy * .009 * i); drawYoyoTop(g, gq, S.R * P.VS * gq.s * (1 - i * .03), m, ang, 0, 0, t, .09); }
     drawYoyoDepth(g, q, R, m, ang, S.reduced ? 0 : S.rollDir * S.spin * .5, hot, t);
   };
   if (!nearer) { if (playing || S.attract) drawString(g, pX, pY, q.x, q.y, Math.min(30, slack), S.tension, S.tangled, t, S.R * .35); drawYo(); }
@@ -1550,6 +1656,50 @@ const el = { score: $("score"), combo: $("combo"), bestHud: $("bestHud"), bestMe
   lvlHud: $("lvlHud"), lvlMenu: $("lvlMenu"), xpBar: $("xpBar"), xpTxt: $("xpTxt"), coinVal: $("coinVal"), coinMenu: $("coinMenu"), coinsHud: $("coinsHud") };
 el.tricks.innerHTML = TRICKS.map((t) => `<span class="t" data-id="${t.id}">${SHORT[t.id]}</span>`).join("");
 const chipEls = Object.fromEntries([...el.tricks.children].map((c) => [c.dataset.id, c]));
+
+/* ---- Info bubble: the how-to text lives behind a small (i) instead of always on screen ---- */
+const TIPS = {
+  sleeper: () => "Throw and let it spin at the end of the string. It scores once it has slept a moment.",
+  breakaway: () => `Throw with your phone angled (or swipe up at a slant) so it flies out to the side.`,
+  dog: () => `While it sleeps, ${tilt.live ? "tilt forward" : fine ? "hold W" : "drag up"} to lower it to the floor so it rolls along.`,
+  baby: () => `While it sleeps, rock your hand left and right 3 times.`,
+  whip: () => `While it sleeps, ${tilt.live ? "tilt" : fine ? "move the mouse" : "drag"} quickly side to side.`,
+  around: () => "Swing harder than a Whip so it loops all the way back past your hand.",
+  bind: () => `Catch it with spin left: ${tilt.live ? "pull your phone back" : fine ? "click or press ↓" : "pull down or tap"} while it is still sleeping.`,
+};
+const info = { btn: document.createElement("button"), pop: $("infoPop"), ttl: $("infoTtl"), txt: $("infoTxt"), mode: "", chip: null, autoT: 0, auto: false };
+info.btn.className = "info-btn"; info.btn.id = "infoBtn"; info.btn.type = "button"; info.btn.textContent = "i"; info.btn.setAttribute("aria-label", "What to do now"); info.btn.setAttribute("aria-expanded", "false");
+el.tricks.appendChild(info.btn);
+function infoTail(target) { // point the bubble's tail at what opened it
+  const bar = info.pop.parentElement.getBoundingClientRect(), w = info.pop.offsetWidth, r = target.getBoundingClientRect(); if (!w) return;
+  const cx = r.left + r.width / 2 - bar.left, left = clamp(cx, w / 2 + 8, bar.width - w / 2 - 8);
+  info.pop.style.left = left + "px"; info.pop.style.setProperty("--tail", clamp(cx - (left - w / 2), 16, w - 16) + "px");
+}
+function infoOpen(mode, chipId) {
+  clearTimeout(info.autoT); info.auto = false; if (info.chip) info.chip.classList.remove("tip"); info.chip = null; info.mode = mode;
+  if (mode === "ctx") { info.ttl.textContent = "What now"; info.txt.textContent = hintFor(); }
+  else { const t = TRICK[chipId]; info.ttl.textContent = `${t.name} · ${t.base} pts`; info.txt.textContent = TIPS[chipId](); info.chip = chipEls[chipId]; info.chip.classList.add("tip"); }
+  info.pop.hidden = false; info.pop.classList.add("on"); info.btn.classList.add("open"); info.btn.classList.remove("pulse"); info.btn.setAttribute("aria-expanded", String(mode === "ctx"));
+  infoTail(mode === "ctx" ? info.btn : info.chip);
+  if (!store.d.seenInfo) { store.d.seenInfo = true; store.save(); }
+}
+function infoClose() {
+  if (!info.mode) return; clearTimeout(info.autoT); info.mode = ""; info.auto = false; info.pop.classList.remove("on"); info.btn.classList.remove("open"); info.btn.setAttribute("aria-expanded", "false");
+  if (info.chip) info.chip.classList.remove("tip"); info.chip = null; setTimeout(() => { if (!info.mode) info.pop.hidden = true; }, 260);
+}
+// bubble UI never reaches the game: it sits above the canvas, and we stop its events and keep focus off it so Space/Enter can't throw
+for (const n of [info.btn, info.pop, el.tricks]) for (const ev of ["pointerdown", "pointerup", "click"]) n.addEventListener(ev, (e) => e.stopPropagation());
+info.btn.addEventListener("click", (e) => { e.preventDefault(); info.btn.blur(); if (info.mode === "ctx") infoClose(); else infoOpen("ctx"); });
+$("infoX").addEventListener("click", (e) => { e.preventDefault(); $("infoX").blur(); infoClose(); });
+el.tricks.addEventListener("click", (e) => { const c = e.target.closest(".t"); if (!c) return; if (info.mode === "chip" && info.chip === c) infoClose(); else infoOpen("chip", c.dataset.id); });
+// a tap anywhere else just closes the bubble (that tap does not also throw)
+addEventListener("pointerdown", (e) => { if (!info.mode || info.pop.contains(e.target) || el.tricks.contains(e.target)) return; const auto = info.auto; infoClose(); if (e.target === cv && !auto) { e.stopPropagation(); e.preventDefault(); } }, true); // the first-run tip never eats the first throw
+addEventListener("keydown", (e) => { if (info.mode && e.code === "Escape") { e.stopImmediatePropagation(); infoClose(); } }, true);
+// first run: the (i) pulses, and the very first throw gets one short tip that dismisses itself
+function infoFirstRun() {
+  if (store.d.seenInfo) return; info.btn.classList.add("pulse");
+  setTimeout(() => { if (store.d.seenInfo || !playing || info.mode || S.phase !== "held") return; infoOpen("ctx"); info.auto = true; info.autoT = setTimeout(infoClose, 4200); }, 700);
+}
 const ICON = {
   tilt: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="7" y="3" width="10" height="18" rx="2.5" transform="rotate(-14 12 12)"/></svg>',
   touch: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11V5.5a1.5 1.5 0 0 1 3 0V11m0-1.5a1.5 1.5 0 0 1 3 0V11m0-.5a1.5 1.5 0 0 1 3 0V15a6 6 0 0 1-6 6h-1a6 6 0 0 1-5-2.7L4.3 15a1.5 1.5 0 0 1 2.4-1.8L9 15"/></svg>',
@@ -1605,7 +1755,7 @@ function updateHud() {
   if (S.score !== last.score) { el.score.textContent = S.score.toLocaleString(); if (S.score > last.score && last.score >= 0) { el.score.classList.remove("bump"); void el.score.offsetWidth; el.score.classList.add("bump"); } last.score = S.score; }
   if (S.combo !== last.combo) { const m = 1 + Math.max(0, S.combo - 1) * .5; el.combo.textContent = "×" + (m % 1 ? m.toFixed(1) : m); el.combo.classList.toggle("on", S.combo >= 2); el.combo.classList.toggle("hot", S.combo >= 4); last.combo = S.combo; }
   if (S.best !== last.best) { el.bestHud.textContent = "Best " + S.best.toLocaleString(); el.bestMenu.textContent = S.best.toLocaleString(); last.best = S.best; }
-  const h = hintFor(); if (h !== last.hint) { el.hint.textContent = h; last.hint = h; }
+  const h = hintFor(); if (h !== last.hint) { el.hint.textContent = h; last.hint = h; if (info.mode === "ctx") info.txt.textContent = h; if (info.auto && S.phase !== "held") infoClose(); }
   const sp = Math.round(S.attract ? 0 : S.spin); if (sp !== last.spin) {
     el.spinVal.textContent = sp; const f = clamp(sp / 110, 0, 1); el.arc.style.strokeDashoffset = String(163.4 * (1 - f));
     el.arc.style.stroke = sp > 40 ? TH.css.accent : sp > 26 ? "#e7a14a" : "#d0604a"; last.spin = sp;
@@ -1673,6 +1823,8 @@ function drawHero() {
   const g = heroCv.getContext("2d"); g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, px, px);
   const R = px * .36 * (.92 + .08 * y.size);
   drawYoyo3q(g, px / 2 - R * .3, px / 2 + R * .06, R, y, heroAng, S.time);
+  // small edge-on inset: how it looks from above while it hangs on the string
+  { const er = R * .24, ex = px * .86, ey = px * .84; g.fillStyle = "rgba(0,0,0,.35)"; g.beginPath(); g.arc(ex, ey, er * 1.45, 0, TAU); g.fill(); drawYoyoEdge(g, ex, ey, er, y, 0, heroAng * 4, 20, 1, S.time); }
 }
 function renderPicker(anim) {
   const y = YOYOS[viewIdx], open = unlocked(y.id);
@@ -1706,8 +1858,9 @@ function startGame() {
   app.classList.add("playing"); $("menu").classList.add("hidden");
   for (const k in last) last[k] = typeof last[k] === "number" ? -1 : "";
   updateMode(); updateHud();
+  infoFirstRun();
 }
-function toMenu() {
+function toMenu() { infoClose();
   saveBest(); playing = false; drag = null; inp.touching = false;
   app.classList.remove("playing"); $("menu").classList.remove("hidden");
   resetAttract(S); renderPicker(false); renderProgress(false); sfx.tension(0);
@@ -1818,6 +1971,7 @@ function tick(dt) {
   stepFx(S, dt);
   if (playing) rigUpdate(dt);
   carnUpdate(dt);
+  yoViewUpdate(dt);
   camUpdate(dt);
   render(clamp(acc / DT, 0, 1));
   if (!playing && !menuEl.classList.contains("hidden")) { heroAng += dt * (YOYOS[viewIdx].special ? 1.1 : .7); drawHero(); }
@@ -1843,11 +1997,15 @@ raf = requestAnimationFrame(frame);
 // test / debug hooks (read-only views + input driving; nothing here bypasses unlocks)
 window.__yo = {
   state: () => ({ phase: S.phase, playing, attract: S.attract, model: S.cfg.id, selected: store.d.selected, theme: store.d.theme, R: Math.round(S.R), L: Math.round(S.L), Lmax: Math.round(S.Lmax), spin: Math.round(S.spin), score: S.score, combo: S.combo, tricks: [...S.scored], hand: [Math.round(S.hand.x), Math.round(S.hand.y)], yo: [Math.round(S.yo.x), Math.round(S.yo.y)], onFloor: S.onFloor, tangled: S.tangled, dpr: DPR, canvas: [cv.width, cv.height], level: store.d.level, xp: store.d.xp, coins: store.d.coins, diamond: unlocked("diamond"), unlocked: YOYOS.filter((y) => unlocked(y.id)).map((y) => y.id), particles: S.particles.length }),
-  sim: S, rig, cam, carn, spawnPlate,
+  sim: S, rig, cam, carn, yoView, spawnPlate,
   manual: (on) => { manualClock = !!on; prevT = performance.now(); },
   advance: (frames = 1, fps = 60) => { for (let i = 0; i < frames; i++) tick(1 / fps); },
   drive: (x, y) => { inp.x = x; if (y != null) inp.y = y; inp.touching = true; },
   release: () => { inp.touching = false; },
+  // test hooks: preview a model's in-play art for this session only (no unlock, nothing saved), toggle plates, yo-yo screen position
+  previewModel: (id) => { if (YO[id]) applyYoyo(S, id); return S.cfg.id; },
+  carnival: (on) => { store.d.carnival = !!on; if (!on) carnReset(); },
+  yoScreen: () => { const q = proj(S.yo.x, S.yo.y); return { x: (q.x - cam.x) * cam.z + P.Ax, y: (q.y - cam.y) * cam.z + P.Acy, r: S.R * P.VS * q.s * cam.z }; },
   // renders every model's art side by side (art preview only; does not unlock anything)
   lineup: (cell = 220) => { const c = document.createElement("canvas"), n = YOYOS.length; c.width = cell * n; c.height = cell * 1.3; const g = c.getContext("2d");
     g.fillStyle = "#0d0b0a"; g.fillRect(0, 0, c.width, c.height);
