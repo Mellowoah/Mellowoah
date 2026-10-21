@@ -85,7 +85,7 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline
 .coin::after{content:"";position:absolute;inset:6px;border-radius:50%;box-shadow:inset 0 0 0 2px rgba(140,86,10,.55)}
 .mode-btn{width:48px;height:48px;display:grid;place-items:center;font-size:9px;font-weight:800;letter-spacing:.06em;color:var(--cream)}
 .mode-btn svg{width:19px;height:19px;margin-bottom:-3px}
-.toast{position:absolute;left:0;right:0;top:30%;text-align:center;pointer-events:none;opacity:0}
+.toast{position:absolute;left:0;right:0;top:max(calc(var(--sat) + 120px),15%);text-align:center;pointer-events:none;opacity:0}
 .toast .n{font-family:var(--game);font-size:44px;line-height:1.05;color:#fff;-webkit-text-stroke:2px rgba(0,0,0,.55);paint-order:stroke fill;
   background:linear-gradient(180deg,#fff,var(--accent-hi) 45%,var(--accent) 80%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;filter:drop-shadow(0 4px 0 rgba(0,0,0,.45)) drop-shadow(0 0 18px rgba(var(--accent-rgb),.6))}
 .toast .p{margin-top:4px;font-family:var(--game);font-size:22px;color:#fff;text-shadow:0 2px 0 rgba(0,0,0,.5)}
@@ -277,10 +277,10 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline
   <div class="sheet" id="howSheet" role="dialog" aria-label="How to play">
     <div class="grab"></div><h2>How to play</h2>
     <ul class="how">
-      <li><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v13m-5-5 5 5 5-5"/></svg></div><div><b>Throw down</b><span>Flick down, tap, or press Throw. The yo-yo drops from your fingers. Flick at an angle for a Breakaway.</span></div></li>
-      <li><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 12h16M8 8l-4 4 4 4M16 8l4 4-4 4"/></svg></div><div><b>Swing for tricks</b><span>While it sleeps, drag to move your hand. Swing wide for Whip and Around the World, rock 3× for Rock the Baby, lower it to the floor to Walk the Dog.</span></div></li>
-      <li><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20V7m-5 5 5-5 5 5"/></svg></div><div><b>Bind it home</b><span>Flick up, tap, or press Bind while the spin is hot. Tricks in one run stack a combo, and points earn XP and coins.</span></div></li>
-      <li><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18h2"/></svg></div><div><b>Tilt mode (phones)</b><span>Tilt to move your hand. Snap your wrist down to throw and up to bind. Touch always works too.</span></div></li>
+      <li><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v13m-5-5 5 5 5-5"/></svg></div><div><b>Throw down</b><span>Your phone is your hand. Swipe up (away from you), tap, or press Throw and the yo-yo flies out toward the floor. Angle the swipe for a Breakaway.</span></div></li>
+      <li><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 12h16M8 8l-4 4 4 4M16 8l4 4-4 4"/></svg></div><div><b>Swing for tricks</b><span>While it sleeps, drag to move your hand. Swing wide for Whip and Around the World, rock 3× for Rock the Baby, drag up to reach it to the floor and Walk the Dog.</span></div></li>
+      <li><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20V7m-5 5 5-5 5 5"/></svg></div><div><b>Bind it home</b><span>Pull down toward you, tap, or press Bind while the spin is hot. Tricks in one run stack a combo, and points earn XP and coins.</span></div></li>
+      <li><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18h2"/></svg></div><div><b>Tilt mode (phones)</b><span>Tilt to move your hand. Flick the phone forward to throw and pull it back toward you to bind. Touch always works too.</span></div></li>
     </ul>
     <button class="btn-main done" data-close>GOT IT</button>
   </div>
@@ -360,11 +360,11 @@ const DIAMOND_HASH = "1b53348b10abe5c76d83800e6779462bfa4ef26f5dc467e4972ae405df
 
 const THEMES = {
   gold: { name: "Gold Arena", kind: "arena", css: { accent: "#e7b15a", hi: "#ffe7a8", lo: "#c98f37", rgb: "231,177,90", cream: "#f6e7b2", ink: "#2a1c0e", panel: "rgba(24,19,15,.82)", panel2: "rgba(44,35,26,.9)", bg: "#09090b" },
-    c: { wallTop: "#2a1d1c", wallMid: "#160f10", wallBot: "#0a0708", floorA: "#2a1a12", floorB: "#0d0807", line: "231,177,90", beam: "255,214,150", glow: "226,61,43", crowd: "255,200,120" }, swatch: "linear-gradient(135deg,#2a1d1c,#e7b15a)" },
+    c: { wallTop: "#2a1d1c", wallMid: "#160f10", wallBot: "#0a0708", floorA: "#2a1a12", floorB: "#0d0807", line: "231,177,90", beam: "255,214,150", glow: "226,61,43", crowd: "255,200,120", fog: "28,18,18" }, swatch: "linear-gradient(135deg,#2a1d1c,#e7b15a)" },
   neon: { name: "Neon Night", kind: "neon", css: { accent: "#3ef0ff", hi: "#c8fdff", lo: "#1aa0d0", rgb: "62,240,255", cream: "#e6fdff", ink: "#04202a", panel: "rgba(8,6,24,.82)", panel2: "rgba(24,14,48,.9)", bg: "#05030d" },
-    c: { wallTop: "#1b0a3a", wallMid: "#0c0620", wallBot: "#05030d", floorA: "#14062e", floorB: "#05020c", line: "255,63,209", beam: "62,240,255", glow: "255,63,209", crowd: "120,220,255" }, swatch: "linear-gradient(135deg,#1b0a3a,#ff3fd1 55%,#3ef0ff)" },
+    c: { wallTop: "#1b0a3a", wallMid: "#0c0620", wallBot: "#05030d", floorA: "#14062e", floorB: "#05020c", line: "255,63,209", beam: "62,240,255", glow: "255,63,209", crowd: "120,220,255", fog: "34,16,70" }, swatch: "linear-gradient(135deg,#1b0a3a,#ff3fd1 55%,#3ef0ff)" },
   sunset: { name: "Sunset Park", kind: "park", css: { accent: "#ff9a5a", hi: "#ffe0b8", lo: "#e0643a", rgb: "255,154,90", cream: "#fff0dc", ink: "#3a1406", panel: "rgba(40,16,28,.78)", panel2: "rgba(70,30,44,.88)", bg: "#2a1030" },
-    c: { skyTop: "#3b1d5c", skyMid: "#c4507a", skyBot: "#ffad66", sun: "255,210,140", hillFar: "#7a3a6a", hillNear: "#4a2048", grassA: "#3f6a3a", grassB: "#1d3320", line: "255,220,150", beam: "255,200,140", glow: "255,120,80" }, swatch: "linear-gradient(160deg,#3b1d5c,#c4507a 50%,#ffad66)" },
+    c: { skyTop: "#3b1d5c", skyMid: "#c4507a", skyBot: "#ffad66", sun: "255,210,140", hillFar: "#7a3a6a", hillNear: "#4a2048", grassA: "#3f6a3a", grassB: "#1d3320", line: "255,220,150", beam: "255,200,140", glow: "255,120,80", fog: "196,120,150" }, swatch: "linear-gradient(160deg,#3b1d5c,#c4507a 50%,#ffad66)" },
 };
 
 /* ================= Storage ================= */
@@ -689,6 +689,28 @@ const probe = document.createElement("div");
 probe.style.cssText = "position:fixed;visibility:hidden;pointer-events:none;padding:env(safe-area-inset-top,0) env(safe-area-inset-right,0) env(safe-area-inset-bottom,0) env(safe-area-inset-left,0)";
 document.body.appendChild(probe);
 let bg = null;
+/* ---- first-person projection ----
+   The physics runs in a flat "world" plane (x = sideways, y = down toward the floor, gravity +y).
+   The camera is your eyes looking down past your own hand at the bottom of the phone, so world-down
+   (toward the floor) is AWAY from you: it maps up-screen toward a vanishing point and shrinks with depth.
+   Things above the hand in the world (top of Around the World) come toward you and grow. */
+const P = { vpx: 0, hy: 0, Yh: 0, Yy0: 0, Dk: 2.3, VS: 1.6, Yf: 0, sf: .3 };
+function layoutView() {
+  const chips = document.getElementById("tricks"), ar = app.getBoundingClientRect();
+  const barTop = chips ? chips.getBoundingClientRect().top - ar.top - 44 : H * .78; // leave room for a 2-line hint
+  const { len } = armGeom();
+  P.vpx = W / 2;
+  P.hy = insets.top + clamp(H * .27, 150, 250);                 // horizon / vanishing point, upper-middle
+  P.Yh = clamp(Math.min(H * .8, barTop - len * .19 - 6), H * .55, H * .82); // fist rests just above the bottom HUD
+  P.Yy0 = P.Yh - S.R * P.VS * .55;                             // a held yo-yo peeks out above the fingers
+  const f = proj(W / 2, S.floorY); P.Yf = f.y; P.sf = f.s;
+}
+function proj(wx, wy) {
+  const y0 = S.handBaseY + S.Lmin * .92, span = Math.max(60, S.floorY - y0), u = (wy - y0) / span;
+  if (u >= 0) { const z = 1 + u * P.Dk, s = 1 / z; return { x: P.vpx + (wx - P.vpx) * s, y: P.hy + (P.Yy0 - P.hy) * s, s, z, u }; }
+  const k = -u / Math.max(.02, S.Lmin * .92 / span), s = 1 + Math.min(.75, -u * .9);
+  return { x: clamp(wx, -40, W + 40), y: P.Yy0 + (P.Yh - P.Yy0) * Math.min(k, 1) + Math.max(0, k - 1) * 7, s, z: 1 / s, u };
+}
 function resize() {
   const r = app.getBoundingClientRect(); W = Math.max(1, r.width); H = Math.max(1, r.height);
   const cs = getComputedStyle(probe); insets = { top: parseFloat(cs.paddingTop) || 0, right: parseFloat(cs.paddingRight) || 0, bottom: parseFloat(cs.paddingBottom) || 0, left: parseFloat(cs.paddingLeft) || 0 };
@@ -699,7 +721,7 @@ function resize() {
   layoutSim(S, W, H, insets);
   if (!wasAttract) { S.hand.x = ox * W; inp.x = S.hand.x; }
   if (!inp.touching) { inp.x = clamp(inp.x || W / 2, 0, W); inp.y = S.handBaseY; }
-  buildBg(); snapPrev(S);
+  layoutView(); buildBg(); snapPrev(S);
 }
 function rnd(seed) { let s = seed >>> 0; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); }
 function rgba(rgb, a) { return `rgba(${rgb},${a})`; }
@@ -708,7 +730,7 @@ function rgba(rgb, a) { return `rgba(${rgb},${a})`; }
 function buildBg() {
   bg = document.createElement("canvas"); bg.width = cv.width; bg.height = cv.height;
   const g = bg.getContext("2d"); g.setTransform(DPR, 0, 0, DPR, 0, 0);
-  const c = TH.c, fy = S.floorY, R = rnd(7);
+  const c = TH.c, fy = P.hy, R = rnd(7);
   if (TH.kind === "park") {
     let lg = g.createLinearGradient(0, 0, 0, fy); lg.addColorStop(0, c.skyTop); lg.addColorStop(.55, c.skyMid); lg.addColorStop(1, c.skyBot); g.fillStyle = lg; g.fillRect(0, 0, W, fy + 2);
     const sx = W * .7, sy = fy - Math.min(H * .16, 150), sr = Math.min(W, H) * .13;
@@ -719,6 +741,8 @@ function buildBg() {
     hills(c.hillFar, fy - H * .05, H * .07, .012, 1); hills(c.hillNear, fy, H * .045, .02, 3);
     g.fillStyle = "#2a1236"; for (let i = 0; i < 7; i++) { const x = (i + .5) / 7 * W + (R() - .5) * 30, h = 40 + R() * 50, y = fy - 4; g.fillRect(x - 2, y - h * .5, 4, h * .5); g.beginPath(); g.arc(x, y - h * .6, h * .28, 0, TAU); g.arc(x - h * .15, y - h * .45, h * .2, 0, TAU); g.arc(x + h * .15, y - h * .45, h * .2, 0, TAU); g.fill(); }
     lg = g.createLinearGradient(0, fy, 0, H); lg.addColorStop(0, c.grassA); lg.addColorStop(1, c.grassB); g.fillStyle = lg; g.fillRect(0, fy, W, H - fy);
+    g.save(); g.beginPath(); g.rect(0, fy, W, H - fy); g.clip(); g.fillStyle = "rgba(255,255,255,.05)";
+    for (let i = -12; i <= 12; i += 2) { g.beginPath(); g.moveTo(P.vpx, fy); g.lineTo(P.vpx + i * W * .16, H + 40); g.lineTo(P.vpx + (i + 1) * W * .16, H + 40); g.closePath(); g.fill(); } g.restore();
     g.strokeStyle = "rgba(160,220,120,.35)"; g.lineWidth = 1.2; for (let x = 0; x < W; x += 4) { const h = 4 + R() * 9; g.beginPath(); g.moveTo(x, fy + 2); g.lineTo(x + (R() - .5) * 4, fy + 2 - h); g.stroke(); }
     g.fillStyle = "rgba(240,200,150,.16)"; g.beginPath(); g.ellipse(W / 2, fy + (H - fy) * .55, W * .5, (H - fy) * .35, 0, 0, TAU); g.fill();
   } else {
@@ -741,23 +765,27 @@ function buildBg() {
       for (let i = 0; i < 6; i++) { const x = (i + .5) / 6 * W; const rg = g.createRadialGradient(x, ty + 8, 0, x, ty + 8, 26); rg.addColorStop(0, rgba(c.beam, .9)); rg.addColorStop(.2, rgba(c.beam, .35)); rg.addColorStop(1, rgba(c.beam, 0)); g.fillStyle = rg; g.fillRect(x - 26, ty - 18, 52, 52); }
     }
     let rg = g.createRadialGradient(W * .5, fy * .78, 10, W * .5, fy * .78, Math.max(W, H) * .55); rg.addColorStop(0, rgba(c.glow, .16)); rg.addColorStop(1, rgba(c.glow, 0)); g.fillStyle = rg; g.fillRect(0, 0, W, fy);
-    // stage floor in perspective
-    lg = g.createLinearGradient(0, fy, 0, H); lg.addColorStop(0, c.floorA); lg.addColorStop(1, c.floorB); g.fillStyle = lg; g.fillRect(0, fy, W, H - fy);
+    // floor plane: lines converge on the vanishing point at the horizon
+    lg = g.createLinearGradient(0, fy, 0, H); lg.addColorStop(0, c.floorB); lg.addColorStop(.35, c.floorA); lg.addColorStop(1, c.floorB); g.fillStyle = lg; g.fillRect(0, fy, W, H - fy);
     g.save(); g.beginPath(); g.rect(0, fy, W, H - fy); g.clip();
-    const vx = W / 2, vy = fy - (H - fy) * 1.6; g.strokeStyle = rgba(c.line, TH.kind === "neon" ? .5 : .13); g.lineWidth = TH.kind === "neon" ? 1.4 : 1;
-    for (let i = -14; i <= 14; i++) { g.beginPath(); g.moveTo(vx + i * W * .02, vy); g.lineTo(vx + i * W * .16, H + 40); g.stroke(); }
-    if (TH.kind !== "neon") for (let k = 1; k < 9; k++) { const y = fy + (H - fy) * (k / 9) ** 1.8; g.globalAlpha = .6; g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); g.globalAlpha = 1; }
-    rg = g.createRadialGradient(W / 2, fy + 10, 4, W / 2, fy + 10, W * .6); rg.addColorStop(0, rgba(c.beam, .16)); rg.addColorStop(1, rgba(c.beam, 0)); g.translate(0, fy); g.scale(1, .25); g.translate(0, -fy); g.fillStyle = rg; g.fillRect(0, fy - W, W, W * 2);
+    g.strokeStyle = rgba(c.line, TH.kind === "neon" ? .5 : .14); g.lineWidth = TH.kind === "neon" ? 1.4 : 1;
+    for (let i = -16; i <= 16; i++) { g.beginPath(); g.moveTo(P.vpx, fy); g.lineTo(P.vpx + i * W * .14, H + 40); g.stroke(); }
+    if (TH.kind !== "neon") for (let k = 1; k < 14; k++) { const y = fy + (H - fy) / (1 + (14 - k) * .55); g.globalAlpha = .7; g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); g.globalAlpha = 1; }
     g.restore();
   }
-  // stage edge
+    // stage edge
   let lg = g.createLinearGradient(0, 0, W, 0); lg.addColorStop(0, rgba(c.line, 0)); lg.addColorStop(.5, rgba(c.line, .8)); lg.addColorStop(1, rgba(c.line, 0));
   g.fillStyle = lg; g.fillRect(0, fy - 1, W, 2);
   lg = g.createLinearGradient(0, fy - 18, 0, fy); lg.addColorStop(0, rgba(c.line, 0)); lg.addColorStop(1, rgba(c.line, .12)); g.fillStyle = lg; g.fillRect(0, fy - 18, W, 18);
+  { const sr = Math.max(40, W * .9 * P.sf), y = P.Yf; // landing spot on the floor under the yo-yo
+    g.save(); g.translate(P.vpx, y); g.scale(1, .3); let rg2 = g.createRadialGradient(0, 0, 0, 0, 0, sr); rg2.addColorStop(0, rgba(c.beam, .26)); rg2.addColorStop(.7, rgba(c.beam, .07)); rg2.addColorStop(1, rgba(c.beam, 0)); g.fillStyle = rg2; g.beginPath(); g.arc(0, 0, sr, 0, TAU); g.fill();
+    g.strokeStyle = rgba(c.line, .35); g.lineWidth = 2.5; g.beginPath(); g.arc(0, 0, sr * .62, 0, TAU); g.stroke(); g.restore(); }
+  // near-floor darkening toward the viewer + vignette
+  { const lg2 = g.createLinearGradient(0, P.Yf, 0, H); lg2.addColorStop(0, "rgba(0,0,0,0)"); lg2.addColorStop(1, "rgba(0,0,0,.45)"); g.fillStyle = lg2; g.fillRect(0, P.Yf, W, H - P.Yf); }
   const vg = g.createRadialGradient(W / 2, H * .45, Math.min(W, H) * .35, W / 2, H * .45, Math.max(W, H) * .8); vg.addColorStop(0, "rgba(0,0,0,0)"); vg.addColorStop(1, "rgba(0,0,0,.62)"); g.fillStyle = vg; g.fillRect(0, 0, W, H);
 }
 function drawLive(g, t) {
-  const c = TH.c, fy = S.floorY;
+  const c = TH.c, fy = P.Yf + 30;
   g.globalCompositeOperation = "lighter";
   if (TH.kind !== "park") {
     const ty = insets.top + 10, n = TH.kind === "neon" ? 4 : 3;
@@ -769,10 +797,10 @@ function drawLive(g, t) {
     }
   }
   if (TH.kind === "neon") { // scrolling synthwave grid
-    g.strokeStyle = "rgba(255,63,209,.35)"; g.lineWidth = 1.2; const N = 10, o = (t * .35) % 1;
-    for (let k = 0; k < N; k++) { const y = fy + (H - fy) * ((k + o) / N) ** 2; g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); }
+    g.strokeStyle = "rgba(255,63,209,.35)"; g.lineWidth = 1.2; const N = 12, o = (t * .35) % 1;
+    for (let k = 0; k < N; k++) { const y = P.hy + (H - P.hy) * ((k + o) / N) ** 2.2; g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); }
   }
-  for (const b of bokeh) { const x = ((b.x + Math.sin(t * b.s * 6 + b.p) * .03) % 1) * W, y = ((b.y - t * b.s * .3) % 1 + 1) % 1 * (TH.kind === "park" ? fy : H); g.globalAlpha = b.a; g.drawImage(glowSprite, x - b.r, y - b.r, b.r * 2, b.r * 2); }
+  for (const b of bokeh) { const x = ((b.x + Math.sin(t * b.s * 6 + b.p) * .03) % 1) * W, y = ((b.y - t * b.s * .3) % 1 + 1) % 1 * H; g.globalAlpha = b.a; g.drawImage(glowSprite, x - b.r, y - b.r, b.r * 2, b.r * 2); }
   g.globalAlpha = 1; g.globalCompositeOperation = "source-over";
 }
 
@@ -783,48 +811,49 @@ const bokeh = Array.from({ length: 18 }, () => ({ x: Math.random(), y: Math.rand
 function makeGlow(rgb) { const c = document.createElement("canvas"); c.width = c.height = 64; const g = c.getContext("2d"); const r = g.createRadialGradient(32, 32, 0, 32, 32, 32); r.addColorStop(0, "rgba(255,245,225,1)"); r.addColorStop(.4, `rgba(${rgb},.38)`); r.addColorStop(1, `rgba(${rgb},0)`); g.fillStyle = r; g.fillRect(0, 0, 64, 64); return c; }
 let glowSprite = makeGlow(TH.css.rgb);
 const flameSprite = (() => { const c = document.createElement("canvas"); c.width = c.height = 64; const g = c.getContext("2d"); const r = g.createRadialGradient(32, 36, 0, 32, 32, 32); r.addColorStop(0, "rgba(255,250,210,1)"); r.addColorStop(.25, "rgba(255,200,60,.9)"); r.addColorStop(.55, "rgba(255,90,20,.5)"); r.addColorStop(1, "rgba(200,20,0,0)"); g.fillStyle = r; g.fillRect(0, 0, 64, 64); return c; })();
-/* ================= Arm rig (side-on view) ================= */
-// The arm enters from the left edge of the screen like your own arm seen from the side: sleeve off-screen,
-// fist in the middle, string hanging straight down from the fingers. Throwing flicks the wrist down and the
-// yo-yo drops away from the hand; binding jerks the fist up. arm.png is natively this side view.
-const ARM_PINCH = { x: .915, y: .47 }; // string exits from under the curled fingers
+/* ================= Arm rig (first-person, looking down) ================= */
+// The phone is your yo-yo hand: your own forearm comes up from the bottom-right edge, fist at the bottom of the
+// screen, string running away from you into the scene. Throw = push forward (fist moves up-screen and shrinks),
+// bind = yank back toward you (fist drops and grows). The forearm is drawn in strips that get wider toward the
+// bottom edge, so it reads as coming toward the camera.
+const ARM_PINCH = { x: .915, y: .47 };
 const ARM_WRIST = { x: .72, y: .525 };
 let armParts = null;
 function buildArmParts() {
   if (armParts || !armImg.complete || !armImg.naturalWidth) return armParts;
   const w = armImg.naturalWidth, h = armImg.naturalHeight, wx = ARM_WRIST.x * w, f = .035 * w;
   const part = (stops) => { const c = document.createElement("canvas"); c.width = w; c.height = h; const g = c.getContext("2d"); g.drawImage(armImg, 0, 0); g.globalCompositeOperation = "destination-in"; const lg = g.createLinearGradient(0, 0, w, 0); for (const [x, a] of stops) lg.addColorStop(clamp(x / w, 0, 1), `rgba(0,0,0,${a})`); g.fillStyle = lg; g.fillRect(0, 0, w, h); return c; };
-  const PAD = 40, shadowOf = (src) => { const c = document.createElement("canvas"); c.width = w + PAD * 2; c.height = h + PAD * 2; const g = c.getContext("2d");
-    g.shadowColor = "#000"; g.shadowBlur = 26; g.shadowOffsetX = c.width + 10; g.drawImage(src, PAD - c.width - 10, PAD); return c; };
   const fore = part([[0, 1], [wx + f, 1], [wx + 2.2 * f, 0], [w, 0]]), hand = part([[0, 0], [wx - f, 0], [wx, 1], [w, 1]]);
-  for (const c of [fore, hand]) { // theme rim light baked onto the top edge (source-atop on the part's own canvas only)
-    const g = c.getContext("2d"); g.globalCompositeOperation = "source-atop"; const lg = g.createLinearGradient(0, 0, 0, h * .5);
+  for (const c of [fore, hand]) { const g = c.getContext("2d"); g.globalCompositeOperation = "source-atop"; const lg = g.createLinearGradient(0, 0, 0, h * .5);
     lg.addColorStop(0, rgba(TH.c.beam, .26)); lg.addColorStop(1, rgba(TH.c.beam, 0)); g.fillStyle = lg; g.fillRect(0, 0, w, h); }
-  armParts = { fore, hand, foreSh: shadowOf(fore), handSh: shadowOf(hand), pad: PAD };
+  // bake the perspective taper once: forearm strips get up to 1.5x thicker toward the shoulder (camera) end
+  const foreT = document.createElement("canvas"); foreT.width = w; foreT.height = Math.ceil(h * 1.5); { const g = foreT.getContext("2d"), c = ARM_WRIST.y * h, N = 24, end = wx * 1.1;
+    for (let i = 0; i < N; i++) { const a = end * i / N, b = end * (i + 1) / N, m = 1 + .5 * clamp(1 - ((a + b) / 2) / wx, 0, 1); g.drawImage(fore, a, 0, b - a + .5, h, a, c * 1.5 - c * m, b - a + .5, h * m); } }
+  armParts = { fore: foreT, hand };
   return armParts;
 }
-const rig = { ox: 0, oy: 0, vox: 0, voy: 0, bend: 0, vb: 0, af: 0, wind: null, t: 0, droop: 0 };
+const rig = { ox: 0, oy: 0, vox: 0, voy: 0, bend: 0, vb: 0, af: -Math.PI / 2 - .3, wind: null, t: 0, droop: 0 };
 function rigReset() { Object.assign(rig, { ox: 0, oy: 0, vox: 0, voy: 0, bend: 0, vb: 0, wind: null, droop: 0 }); }
 function rigKick(dx, dy, db) { if (S.reduced) { dx *= .3; dy *= .3; db *= .3; } rig.vox += dx; rig.voy += dy; rig.vb += db; }
-// bend > 0 = wrist flexes clockwise = fingers point down (the throwing flick). bend < 0 = wrist cocks up.
+// screen-space rig: oy < 0 = fist pushed forward (away from you), oy > 0 = pulled back toward you
 function requestThrow(power, side = 0, wrist = 0, anticipate = true) {
   if (S.phase !== "held" || rig.wind || S.pendingThrow) return;
   if (!anticipate || S.reduced) { queueThrow(S, power, side, wrist); return; }
   rig.wind = { t: 0, dur: .085, power, side, wrist };
-  rigKick(-side * 40, -300 - power * 160, -(7 + power * 4)); // wind-up: hand lifts, wrist cocks back
+  rigKick(-side * 40, 300 + power * 160, -(7 + power * 4)); // wind-up: fist draws back toward you, wrist cocks
 }
 function rigUpdate(dt) {
   rig.t += dt;
   if (rig.wind) { rig.wind.t += dt; if (rig.wind.t >= rig.wind.dur) { const w = rig.wind; rig.wind = null; queueThrow(S, w.power, w.side, w.wrist); } }
   const t = rig.t, sleeping = S.phase === "sleep", idle = S.phase === "held" || sleeping || S.phase === "dead";
-  const sDir = Math.atan2(S.yo.y - S.hand.y, S.yo.x - S.hand.x) - Math.PI / 2; // 0 = string straight down
-  const follow = S.phase === "held" ? 0 : -clamp(sDir, -1.3, 1.3) * (.18 + .3 * S.tension); // fist tips toward the yo-yo
-  const lag = clamp(-S.hand.vy / 2600, -1, 1) * .16 + clamp(S.hand.vx / 2600, -1, 1) * .06;
+  const side = Math.atan2(S.yo.x - S.hand.x, Math.max(20, Math.abs(S.yo.y - S.hand.y)));
+  const follow = S.phase === "held" ? 0 : clamp(side, -1.2, 1.2) * (.16 + .26 * S.tension); // fist tips toward the yo-yo
+  const lag = clamp(S.hand.vx / 2600, -1, 1) * .08;
   rig.droop += ((S.phase === "dead" ? .14 : 0) - rig.droop) * (1 - Math.exp(-3 * dt));
   const breathe = idle && !S.reduced ? 1 : .25;
-  const tb = clamp(follow + lag + Math.sin(t * 1.25) * .035 * breathe + (S.phase === "return" ? -.1 : 0) + rig.droop + S.tension * .05, -.95, .95);
+  const tb = clamp(follow + lag + Math.sin(t * 1.25) * .035 * breathe + (S.phase === "return" ? -.08 : 0) - rig.droop, -.9, .9);
   const tx = Math.sin(t * .8) * 1.6 * breathe + (sleeping ? Math.sin(t * .45) * 1.4 : 0);
-  const ty = Math.sin(t * 1.7) * 1.8 * breathe + S.tension * 4 + rig.droop * 26;
+  const ty = Math.sin(t * 1.7) * 1.8 * breathe - S.tension * 5 + rig.droop * 24; // string tension pulls the fist forward
   let n = Math.ceil(dt / (1 / 240)); const h = dt / Math.max(1, n);
   const kp = 240, cp = 2 * .42 * Math.sqrt(kp), kb = 200, cb = 2 * .48 * Math.sqrt(kb);
   while (n-- > 0) {
@@ -832,43 +861,43 @@ function rigUpdate(dt) {
     rig.vb += (kb * (tb - rig.bend) - cb * rig.vb) * h;
     rig.ox += rig.vox * h; rig.oy += rig.voy * h; rig.bend += rig.vb * h;
   }
-  rig.ox = clamp(rig.ox, -26, 26); rig.oy = clamp(rig.oy, -40, 44); rig.bend = clamp(rig.bend, -1, 1);
+  rig.ox = clamp(rig.ox, -26, 26); rig.oy = clamp(rig.oy, -46, 42); rig.bend = clamp(rig.bend, -1, 1);
 }
 function rigEvent(e) {
   const sx = Math.sign(S.yo.vx || 1);
   switch (e.type) {
-    case "throw": rigKick(S.rollDir * 40, 620 + e.power * 520, 10 + e.power * 8); break; // flick down + follow-through
-    case "tug": rigKick(0, -950, -9); break;           // sharp upward jerk, wrist snaps up
-    case "catch": rigKick(0, e.clean ? 420 : 260, e.clean ? 6 : 3); break;
-    case "sleep": rigKick(0, 220, 3); break;
-    case "snap": rigKick(0, 260 * e.force, 4 * e.force); break;
-    case "hit": rigKick(0, 90 * e.force, 2); break;
+    case "throw": rigKick(S.rollDir * 40, -(620 + e.power * 520), 10 + e.power * 8); break; // push forward + wrist flick
+    case "tug": rigKick(0, 950, -9); break;            // yank back toward you
+    case "catch": rigKick(0, e.clean ? 420 : 260, e.clean ? 6 : 3); break; // yo-yo slaps into the palm
+    case "sleep": rigKick(0, -220, 3); break;          // string goes taut, tugs the fist forward
+    case "snap": rigKick(0, -260 * e.force, 4 * e.force); break;
+    case "hit": rigKick(0, -90 * e.force, 2); break;
     case "die": rigKick(0, 160, -2); break;
     case "tangle": rigKick(80, 120, -6); break;
     case "trick":
-      if (e.id === "around") rigKick(sx * 260, -180, sx * 9);
-      else if (e.id === "whip") rigKick(sx * 180, 120, sx * 7);
-      else if (e.id === "baby") rigKick(-Math.sign(S.yo.x - S.hand.x || 1) * 200, -60, -6);
-      else if (e.id === "dog") rigKick(0, 140, 4);
+      if (e.id === "around") rigKick(sx * 260, 180, sx * 9);
+      else if (e.id === "whip") rigKick(sx * 180, -120, sx * 7);
+      else if (e.id === "baby") rigKick(-Math.sign(S.yo.x - S.hand.x || 1) * 200, 60, -6);
+      else if (e.id === "dog") rigKick(0, -140, 4);
       break;
   }
 }
-function armGeom() { const iw = armImg.naturalWidth || 1100, ih = armImg.naturalHeight || 389, len = clamp(Math.min(W, H) * .85, 260, 420); return { iw, ih, len, th: len * ih / iw }; }
-function drawArm(g, px, py) {
+function armGeom() { const iw = armImg.naturalWidth || 1100, ih = armImg.naturalHeight || 389, len = clamp(Math.min(W, H) * 1.05, 330, 520); return { iw, ih, len, th: len * ih / iw }; }
+function drawArm(g, px, py, depthS) {
   const parts = buildArmParts(); if (!parts) return;
-  const { iw, ih, len, th } = armGeom();
+  const geo = armGeom(), hs = clamp(1 + rig.oy * .0035, .84, 1.16) * clamp(depthS, .6, 1.15);
+  const iw = geo.iw, ih = geo.ih, len = geo.len * hs, th = geo.th * hs;
   const wx = ARM_WRIST.x * len, wy = ARM_WRIST.y * th, dx = (ARM_PINCH.x - ARM_WRIST.x) * len, dy = (ARM_PINCH.y - ARM_WRIST.y) * th;
-  // shoulder pivot sits off-screen to the left, a little above the hand; the forearm slopes gently down into frame
-  const dir0 = clamp(Math.atan2(80, W / 2), .06, .2), D = len * 1.2, ax = W / 2 - dx - D * Math.cos(dir0), ay = S.handBaseY - D * Math.sin(dir0);
-  let af = rig.af, ah = af + rig.bend, wX = px, wY = py;
-  for (let i = 0; i < 3; i++) { const c = Math.cos(ah), s = Math.sin(ah); wX = px - (c * dx - s * dy); wY = py - (s * dx + c * dy); af = Math.atan2(wY - ay, wX - ax); ah = af + rig.bend; }
+  // shoulder off-screen below and to the right; the forearm rises up-left toward the fist
+  const dir0 = -Math.PI / 2 - .3, D = geo.len * 1.25, ax = W / 2 - D * Math.cos(dir0) + W * .06, ay = P.Yh - D * Math.sin(dir0);
+  let af = rig.af, ah = af + rig.bend * .6, wX = px, wY = py;
+  for (let i = 0; i < 3; i++) { const c = Math.cos(ah), s = Math.sin(ah); wX = px - (c * dx - s * dy); wY = py - (s * dx + c * dy); af = Math.atan2(wY - ay, wX - ax); ah = af + rig.bend * .6; }
   rig.af = af;
-  const k = len / iw, pd = parts.pad * k, SH = 10;
-  g.save(); g.globalAlpha = .45;
-  g.save(); g.translate(wX, wY + SH); g.rotate(af); g.drawImage(parts.foreSh, parts.pad + 2, 0, 6, ih + parts.pad * 2, -wx - 900 + 3, -wy - pd, 900, th + pd * 2); g.drawImage(parts.foreSh, -wx - pd, -wy - pd, len + pd * 2, th + pd * 2); g.restore();
-  g.save(); g.translate(wX, wY + SH); g.rotate(ah); g.drawImage(parts.handSh, -wx - pd, -wy - pd, len + pd * 2, th + pd * 2); g.restore();
-  g.restore();
-  g.save(); g.translate(wX, wY); g.rotate(af); g.drawImage(armImg, 2, 0, 6, ih, -wx - 900 + 3, -wy, 900, th); g.drawImage(parts.fore, -wx, -wy, len, th); g.restore();
+  const k = len / iw, pd = parts.pad * k;
+  // (no cast shadow in first person: the floor is far below the arm, so the arm reads cleaner without one)
+  g.save(); g.translate(wX, wY); g.rotate(af);
+  g.drawImage(parts.fore, 1, 0, 4, parts.fore.height, -wx - 900 + 3, -wy * 1.5, 900, th * 1.5); // sleeve continues off the bottom edge
+  g.drawImage(parts.fore, -wx, -wy * 1.5, len, th * 1.5); g.restore();
   g.save(); g.translate(wX, wY); g.rotate(ah); g.drawImage(parts.hand, -wx, -wy, len, th); g.restore();
 }
 
@@ -975,16 +1004,16 @@ function drawYoyo3q(g, cx, cy, R, m, ang, t) {
 }
 
 /* ================= Rendering ================= */
-function drawString(g, ax, ay, bx, by, L, tension, tangled, t) {
-  const d = Math.hypot(bx - ax, by - ay), sag = Math.min(70, Math.sqrt(Math.max(0, L * L - d * d)) * .45);
-  const vib = L - d < 4 ? Math.sin(t * (30 + tension * 50)) * tension * 1.2 : 0;
-  const mx = (ax + bx) / 2 + vib, my = (ay + by) / 2 + sag;
+function drawString(g, ax, ay, bx, by, sag, tension, tangled, t, knot) {
+  const vib = sag < 2 ? Math.sin(t * (30 + tension * 50)) * tension * 1.2 : 0;
+  const mx = (ax + bx) / 2 + vib, my = (ay + by) / 2 - sag; // gravity pulls the slack away from you (up-screen)
   const path = (ox, oy) => { g.beginPath(); g.moveTo(ax + ox, ay + oy);
-    if (tangled) { const k = S.R * .35; g.quadraticCurveTo(mx - k + ox, my - k * .4 + oy, mx + ox, my + oy); g.arc(mx + ox, my + oy - k * .4, k * .4, Math.PI / 2, Math.PI * 2.5); g.quadraticCurveTo(mx + k + ox, my + k * .6 + oy, bx + ox, by + oy); }
+    if (tangled) { const k = knot; g.quadraticCurveTo(mx - k + ox, my - k * .4 + oy, mx + ox, my + oy); g.arc(mx + ox, my + oy - k * .4, k * .4, Math.PI / 2, Math.PI * 2.5); g.quadraticCurveTo(mx + k + ox, my + k * .6 + oy, bx + ox, by + oy); }
     else g.quadraticCurveTo(mx + ox, my + oy, bx + ox, by + oy); };
   g.lineCap = "round";
-  path(1, 1.5); g.strokeStyle = "rgba(0,0,0,.38)"; g.lineWidth = 2.4; g.stroke();
-  path(0, 0); g.strokeStyle = TH.kind === "neon" ? "#eafcff" : "#f4efe4"; g.lineWidth = 1.35; g.stroke();
+  path(1, 1.5); g.strokeStyle = "rgba(0,0,0,.38)"; g.lineWidth = 2.6; g.stroke();
+  // string thins with distance: draw near half thicker
+  path(0, 0); const lg = g.createLinearGradient(ax, ay, bx, by); const sc = TH.kind === "neon" ? "234,252,255" : "244,239,228"; lg.addColorStop(0, rgba(sc, 1)); lg.addColorStop(1, rgba(sc, .75)); g.strokeStyle = lg; g.lineWidth = 1.6; g.stroke();
   if (tension > .25) { path(0, 0); g.strokeStyle = rgba(TH.css.rgb, (tension - .25) * .55); g.lineWidth = 3; g.globalCompositeOperation = "lighter"; g.stroke(); g.globalCompositeOperation = "source-over"; }
 }
 const PETAL_COLS = ["#ffd6ea", "#e6dcff", "#ffffff", "#ffc2dc", "#fff0a8"];
@@ -1016,35 +1045,60 @@ function drawParticles(g, list) {
   g.globalAlpha = 1; g.globalCompositeOperation = "source-over";
 }
 let frameDtVis = 1 / 60;
+let fogSprite = null, fogFor = "";
+function ensureFog() { if (fogFor === TH.c.fog) return; fogFor = TH.c.fog; const c = document.createElement("canvas"); c.width = c.height = 64; const g = c.getContext("2d"); const r = g.createRadialGradient(32, 32, 10, 32, 32, 32); r.addColorStop(0, rgba(TH.c.fog, 0)); r.addColorStop(.5, rgba(TH.c.fog, .55)); r.addColorStop(1, rgba(TH.c.fog, 0)); g.fillStyle = r; g.fillRect(0, 0, 64, 64); fogSprite = c; }
+function projParticles(list) { // world particles -> screen, sized by depth
+  const out = new Array(list.length);
+  for (let i = 0; i < list.length; i++) { const p = list[i], q = proj(p.x, p.y), m = q.s * P.VS * .8;
+    out[i] = { kind: p.kind, x: q.x, y: q.y, vx: p.vx * q.s, vy: -p.vy * q.s, life: p.life, max: p.max, size: p.size * m, rot: p.rot, col: p.col }; }
+  return out;
+}
+function drawYoyoDepth(g, q, R, m, ang, omega, hot, t) { // yo-yo at depth: fog + slight depth blur when far
+  const fog = clamp((q.z - 1.25) / (P.Dk * .9), 0, 1);
+  drawYoyo(g, q.x, q.y, R, m, ang, omega, frameDtVis, hot, 1, t);
+  // cheap depth-of-field: a soft fogged halo softens the silhouette of far yo-yos (ctx.filter blur is far too slow on CPU raster)
+  if (fog > .25 && !S.reduced) { const hr = R * 1.9; g.globalAlpha = (fog - .25) * .55; g.drawImage(fogSprite, q.x - hr, q.y - hr, hr * 2, hr * 2); g.globalAlpha = 1; }
+  if (fog > 0) { g.globalAlpha = fog * .5; g.fillStyle = rgba(TH.c.fog, 1); g.beginPath(); g.arc(q.x, q.y, R * 1.02, 0, TAU); g.fill(); g.globalAlpha = 1; }
+}
 function render(alpha) {
+  ensureFog();
   const g = ctx; g.setTransform(1, 0, 0, 1, 0, 0);
-  // punch-zoom: the whole arena kicks in a touch on big tricks
   const pz = 1 + S.punch, sx = S.shake ? (Math.random() - .5) * S.shake * 2 : 0, sy = S.shake ? (Math.random() - .5) * S.shake * 2 : 0;
-  const ox = W / 2, oy = S.floorY * .6;
+  const ox = W / 2, oy = P.hy + (P.Yh - P.hy) * .4;
   if (pz > 1.001 || sx || sy) { g.fillStyle = "#000"; g.fillRect(0, 0, cv.width, cv.height); }
   g.setTransform(DPR * pz, 0, 0, DPR * pz, DPR * (ox - ox * pz + sx * .5), DPR * (oy - oy * pz + sy * .5));
   g.drawImage(bg, 0, 0, W, H);
   const t = S.time;
   drawLive(g, t);
   g.translate(sx * .5, sy * .5);
-  const hx = lerp(S.hand.px, S.hand.x, alpha), hy = lerp(S.hand.py, S.hand.y, alpha); let yx = lerp(S.yo.px, S.yo.x, alpha), yy = lerp(S.yo.py, S.yo.y, alpha);
-  const ang = lerp(S.pAngle, S.angle, alpha), R = S.R, m = S.cfg, hot = clamp((S.spin - 30) / 50, 0, 1);
-  // light pool + floor shadow
-  const hgt = clamp((S.floorY - (yy + R)) / 260, 0, 1);
-  g.save(); g.translate(yx, S.floorY); g.scale(1, .22); const sr = R * (.7 + hgt * .9);
-  let rg = g.createRadialGradient(0, 0, 1, 0, 0, sr); rg.addColorStop(0, `rgba(0,0,0,${.55 * (1 - hgt * .7)})`); rg.addColorStop(1, "rgba(0,0,0,0)"); g.fillStyle = rg; g.beginPath(); g.arc(0, 0, sr, 0, TAU); g.fill(); g.restore();
-  if (hot > 0 || S.attract) { const gr = R * (2.6 + hot * 1.4); g.globalCompositeOperation = "lighter"; g.globalAlpha = .18 + hot * .3; g.drawImage(glowSprite, yx - gr, yy - gr, gr * 2, gr * 2); g.globalAlpha = 1; g.globalCompositeOperation = "source-over"; }
-  if (hgt < .25) { g.save(); g.beginPath(); g.rect(0, S.floorY, W, H - S.floorY); g.clip(); g.translate(0, S.floorY * 2); g.scale(1, -1); drawYoyo(g, yx, yy, R, m, ang, 0, 0, 0, .13 * (1 - hgt * 4), t); g.restore(); }
-  const pX = hx + (playing ? rig.ox : 0), pY = hy + (playing ? rig.oy : 0);
-  if (S.phase === "held" && playing) { yx += rig.ox; yy += rig.oy; }
-  drawString(g, pX, pY, yx, yy - R * .1, S.phase === "held" ? S.Lmin : S.L, S.tension, S.tangled, t);
-  const sp = Math.hypot(S.yo.vx, S.yo.vy);
-  if (sp > 520 * S.scale && S.phase !== "held" && !S.reduced) for (let i = 3; i >= 1; i--) drawYoyo(g, yx - S.yo.vx * .009 * i, yy - S.yo.vy * .009 * i, R * (1 - i * .03), m, ang, 0, 0, 0, .09, t);
-  drawYoyo(g, yx, yy, R, m, ang, S.reduced ? 0 : S.rollDir * S.spin * .5, frameDtVis, hot, 1, t);
-  if (playing) drawArm(g, pX, pY);
-  drawParticles(g, S.particles);
-  g.font = `${Math.round(18 + 8 * S.scale)}px "Lilita One", Outfit, sans-serif`; g.textAlign = "center"; g.textBaseline = "middle"; g.lineJoin = "round";
-  for (const f of S.floaters) { const a = clamp(f.life / .4, 0, 1), s = 1 + Math.max(0, f.life - f.max + .15) * 3; g.globalAlpha = a; g.save(); g.translate(f.x, f.y); g.scale(s, s); g.lineWidth = 4; g.strokeStyle = "rgba(0,0,0,.6)"; g.strokeText(f.text, 0, 0); g.fillStyle = TH.css.hi; g.fillText(f.text, 0, 0); g.restore(); }
+  const hxW = lerp(S.hand.px, S.hand.x, alpha), hyW = lerp(S.hand.py, S.hand.y, alpha), yxW = lerp(S.yo.px, S.yo.x, alpha), yyW = lerp(S.yo.py, S.yo.y, alpha);
+  const ang = lerp(S.pAngle, S.angle, alpha), m = S.cfg, hot = clamp((S.spin - 30) / 50, 0, 1);
+  const hq = proj(hxW, hyW), held = S.phase === "held" && playing;
+  const pX = hq.x + (playing ? rig.ox : 0), pY = hq.y + (playing ? rig.oy : 0);
+  let q = proj(yxW, yyW);
+  if (held) q = { x: pX, y: pY - (P.Yh - P.Yy0) * clamp(1 + rig.oy * .0035, .84, 1.16), s: 1, z: 1, u: 0 };
+  const R = S.R * P.VS * q.s;
+  // contact shadow on the floor: grows darker and sharper as the yo-yo nears it
+  const gap = clamp((S.floorY - (yyW + S.R)) / Math.max(80, (S.floorY - S.handBaseY) * .7), 0, 1);
+  if (!held || !playing) { const f = proj(yxW, S.floorY), sr = S.R * P.VS * f.s * (1 + gap * 1.6), a = .62 * (1 - gap * .85);
+    g.save(); g.translate(f.x, f.y); g.scale(1, .32); const rg = g.createRadialGradient(0, 0, 0, 0, 0, sr); rg.addColorStop(0, `rgba(0,0,0,${a})`); rg.addColorStop(clamp(.75 - gap * .65, .1, .75), `rgba(0,0,0,${a * .8})`); rg.addColorStop(1, "rgba(0,0,0,0)"); g.fillStyle = rg; g.beginPath(); g.arc(0, 0, sr, 0, TAU); g.fill(); g.restore(); }
+  if (hot > 0 || S.attract) { const gr = R * (2.6 + hot * 1.4); g.globalCompositeOperation = "lighter"; g.globalAlpha = .16 + hot * .28; g.drawImage(glowSprite, q.x - gr, q.y - gr, gr * 2, gr * 2); g.globalAlpha = 1; g.globalCompositeOperation = "source-over"; }
+  // string from the fingers out to the axle; slack sags away from you
+  const dW = Math.hypot(yxW - hxW, yyW - hyW), slack = held ? 0 : Math.sqrt(Math.max(0, S.L * S.L - dW * dW)) * .45 * (hq.s + q.s) * .5;
+  const nearer = q.u < -.02 && !held; // yo-yo closer to the camera than the fist (top of Around the World)
+  const drawYo = () => {
+    const sp = Math.hypot(S.yo.vx, S.yo.vy);
+    if (sp > 520 * S.scale && !held && !S.reduced) for (let i = 3; i >= 1; i--) { const gq = proj(yxW - S.yo.vx * .009 * i, yyW - S.yo.vy * .009 * i); drawYoyo(g, gq.x, gq.y, S.R * P.VS * gq.s * (1 - i * .03), m, ang, 0, 0, 0, .09, t); }
+    drawYoyoDepth(g, q, R, m, ang, S.reduced ? 0 : S.rollDir * S.spin * .5, hot, t);
+  };
+  if (!nearer) { if (playing || S.attract) drawString(g, pX, pY, q.x, q.y + R * .1, Math.min(60, slack), S.tension, S.tangled, t, S.R * .35); drawYo(); }
+  if (playing) drawArm(g, pX, pY, hq.s);
+  if (nearer) { drawString(g, pX, pY, q.x, q.y, Math.min(60, slack), S.tension, S.tangled, t, S.R * .35); drawYo(); }
+  drawParticles(g, projParticles(S.particles));
+  g.textAlign = "center"; g.textBaseline = "middle"; g.lineJoin = "round";
+  for (const f of S.floaters) { const fq = proj(f.x, f.y + S.R + 12), a = clamp(f.life / .4, 0, 1), sc = (1 + Math.max(0, f.life - f.max + .15) * 3) * clamp(fq.s * 1.6, .7, 1.3);
+    g.font = `${Math.round(18 + 8 * S.scale)}px "Lilita One", Outfit, sans-serif`;
+    g.globalAlpha = a; g.save(); g.translate(fq.x, fq.y - 28 * fq.s - (f.max - f.life) * 30); g.scale(sc, sc); g.lineWidth = 4; g.strokeStyle = "rgba(0,0,0,.6)"; g.strokeText(f.text, 0, 0); g.fillStyle = TH.css.hi; g.fillText(f.text, 0, 0); g.restore(); }
   g.globalAlpha = 1;
 }
 /* ================= Input: touch / mouse ================= */
@@ -1066,7 +1120,7 @@ cv.addEventListener("pointermove", (e) => {
   const dx = e.clientX - drag.sx, dy = e.clientY - drag.sy; drag.moved = Math.max(drag.moved, Math.hypot(dx, dy));
   // relative drag (no jump to the finger) — mouse uses absolute since the cursor is the hand
   inp.x = drag.mouse ? e.clientX : drag.ox + dx;
-  inp.y = drag.oy + dy * .9;
+  inp.y = drag.oy - dy * .9; // first-person: pushing your finger up reaches forward/down toward the floor
 });
 function endDrag(e) {
   if (!drag || e.pointerId !== drag.id) return;
@@ -1078,8 +1132,9 @@ function endDrag(e) {
   // forgiving swipe: either a fast flick, or a clear short swipe (≥60px in <0.5s) in mostly-vertical direction
   const ty = e.clientY - d.sy, tx = e.clientX - d.sx, quick = dur < 500 && Math.abs(ty) > 60;
   const down = (vy > 450 || (quick && ty > 0)) && Math.abs(ty) > Math.abs(tx) * .6, up = (vy < -450 || (quick && ty < 0)) && Math.abs(ty) > Math.abs(tx) * .6;
-  if (down && S.phase === "held") requestThrow(clamp(Math.max(vy, ty / Math.max(.08, dur / 1000)) / 2400, .45, 1), clamp(vx, -1500, 1500) * .35);
-  else if (up && S.phase !== "held") queueTug(S);
+  // first-person: swipe UP (away from you) throws, pull DOWN (back toward you) binds
+  if (up && S.phase === "held") requestThrow(clamp(Math.max(-vy, -ty / Math.max(.08, dur / 1000)) / 2400, .45, 1), clamp(vx, -1500, 1500) * .35);
+  else if (down && S.phase !== "held") queueTug(S);
 }
 cv.addEventListener("pointerup", endDrag); cv.addEventListener("pointercancel", endDrag);
 cv.addEventListener("contextmenu", (e) => e.preventDefault());
@@ -1094,8 +1149,8 @@ addEventListener("keydown", (e) => {
   if (e.repeat) return;
   inp.keys.add(e.code);
   if (e.code === "Space" || e.code === "Enter") primary();
-  else if (e.code === "ArrowUp" || e.code === "KeyW") { if (S.phase !== "held") queueTug(S); }
-  else if (e.code === "ArrowDown" && S.phase === "held") requestThrow(.9);
+  else if ((e.code === "ArrowUp" || e.code === "KeyW") && S.phase === "held") requestThrow(.9);      // push away = throw
+  else if ((e.code === "ArrowDown" || e.code === "KeyS") && S.phase !== "held") queueTug(S);         // pull back = bind
 });
 addEventListener("keyup", (e) => inp.keys.delete(e.code));
 addEventListener("blur", () => inp.keys.clear());
@@ -1126,11 +1181,12 @@ function onMotion(e) {
   const rr = r ? Math.hypot(r.alpha || 0, r.beta || 0, r.gamma || 0) : 0, la = a ? Math.hypot(a.x || 0, a.y || 0, a.z || 0) : 0;
   const score = Math.max(rr / 300, la / 15), now = performance.now();
   if (now < tilt.cool) return;
-  if (score > 1) { tilt.peak = Math.max(tilt.peak, score); tilt.side = r ? (r.gamma || 0) : 0; return; }
+  if (score > 1) { if (score > tilt.peak) { tilt.side = r ? (r.gamma || 0) : 0; tilt.pitch = r ? (r.beta || 0) : 0; } tilt.peak = Math.max(tilt.peak, score); return; }
   if (tilt.peak > 1 && score < .6) {
-    const p = tilt.peak; tilt.peak = 0; tilt.cool = now + 520;
-    if (S.phase === "held") requestThrow(clamp(.35 + p * .3, .45, 1), 0, clamp(tilt.side / 600, -1, 1), false); // real wrist already wound up
-    else if (S.phase !== "out" || S.L > S.Lmax * .3) queueTug(S);
+    const p = tilt.peak, pitch = tilt.pitch || 0; tilt.peak = 0; tilt.pitch = 0; tilt.cool = now + 520;
+    // pitch < 0: top of the phone flicked forward/down (away from you) -> throw; pitch > 0: pulled back toward you -> bind
+    if (S.phase === "held") { if (pitch < 150) requestThrow(clamp(.35 + p * .3, .45, 1), 0, clamp(tilt.side / 600, -1, 1), false); } // real wrist already wound up
+    else if (pitch > -150 && (S.phase !== "out" || S.L > S.Lmax * .3)) queueTug(S);
   }
 }
 function enableTilt(fromGesture) {
@@ -1172,22 +1228,22 @@ function toast(name, sub, bad, big) {
   t.classList.toggle("bad", !!bad); t.classList.toggle("big", !!big); t.classList.remove("show"); void t.offsetWidth; t.classList.add("show");
 }
 function hintFor() {
-  const tiltOn = tilt.live, throwHow = tiltOn ? "Snap your wrist down or tap to throw" : fine ? "Click, press Space, or flick down to throw" : "Flick down or tap to throw";
-  const bindHow = tiltOn ? "snap your wrist up" : fine ? "click" : "flick up or tap";
+  const tiltOn = tilt.live, throwHow = tiltOn ? "Flick your phone forward or tap to throw" : fine ? "Click, press Space or ↑, or flick up to throw" : "Swipe up (away from you) or tap to throw";
+  const bindHow = tiltOn ? "pull your phone back" : fine ? "click or press ↓" : "pull down or tap";
   const Bind = bindHow[0].toUpperCase() + bindHow.slice(1);
   if (S.tangled) return `The string tangled. ${Bind} to reel it in.`;
   switch (S.phase) {
-    case "held": return S.throws === 0 ? `${throwHow}. ${fine && !tiltOn ? "Move the mouse to move your hand." : "Drag to move your hand."}` : `${throwHow}. Flick at an angle for a Breakaway.`;
-    case "out": return "Here it goes…";
-    case "return": return S.manual || S.spin < 4.5 ? "Reeling it in by hand…" : "Climbing the string. Tap to pump it.";
+    case "held": return S.throws === 0 ? `${throwHow}. ${fine && !tiltOn ? "Move the mouse to move your hand." : "Drag to move your hand."}` : `${throwHow}. Angle it for a Breakaway.`;
+    case "out": return "There it goes…";
+    case "return": return S.manual || S.spin < 4.5 ? "Reeling it in by hand…" : "Coming back to you. Tap to pump it.";
     case "dead": return `Spin died. ${Bind} to reel it in. Your points stay.`;
     case "sleep": {
       if (S.spin <= 26) return `Spin is low. ${Bind} now for a soft catch.`;
       const has = (id) => S.scored.has(id), move = tiltOn ? "Tilt" : fine ? "Move the mouse" : "Drag";
       if (!has("whip") && !has("around")) return `It's sleeping. ${move} side to side for a Whip, or ${bindHow} to Bind.`;
-      if (!has("around")) return "Swing harder, up beside your hand, for Around the World.";
+      if (!has("around")) return "Swing harder so it loops back past your hand: Around the World.";
       if (!has("baby")) return `Rock it left and right 3 times, or ${bindHow} to Bind.`;
-      if (!has("dog")) return `${tiltOn ? "Lower your hand" : "Drag down"} to let it roll on the floor and Walk the Dog.`;
+      if (!has("dog")) return `${tiltOn ? "Tilt forward" : fine ? "Hold W" : "Drag up"} to reach toward the floor and Walk the Dog.`;
       return `This run is full. ${Bind} to Bind and bank it.`;
     }
   }
@@ -1399,11 +1455,11 @@ function tick(dt) {
   if (!(dt > 0)) dt = 0; dt = Math.min(dt, .1);
   frameDtVis = lerp(frameDtVis, clamp(dt, 1 / 240, 1 / 20), .2);
   if (playing) {
-    if (inp.keys.size) { const v = 560 * S.scale * dt; if (inp.keys.has("ArrowLeft") || inp.keys.has("KeyA")) inp.x -= v; if (inp.keys.has("ArrowRight") || inp.keys.has("KeyD")) inp.x += v; if (inp.keys.has("KeyS") || (inp.keys.has("ArrowDown") && S.phase !== "held")) inp.y += v; }
+    if (inp.keys.size) { const v = 560 * S.scale * dt; if (inp.keys.has("ArrowLeft") || inp.keys.has("KeyA")) inp.x -= v; if (inp.keys.has("ArrowRight") || inp.keys.has("KeyD")) inp.x += v; if (S.phase !== "held" && (inp.keys.has("KeyW") || inp.keys.has("ArrowUp"))) inp.y += v; }
     if (tilt.live && !inp.touching) {
       inp.x = W / 2 + clamp(tilt.fx / 24, -1, 1) * W * .42;
       inp.y = S.handBaseY + clamp(-tilt.fy / 22, -.15, 1) * (S.handMaxY - S.handBaseY);
-    } else if (!inp.touching && !inp.keys.has("KeyS") && !inp.keys.has("ArrowDown")) inp.y += (S.handBaseY - inp.y) * (1 - Math.exp(-3.2 * dt));
+    } else if (!inp.touching && !inp.keys.has("KeyW") && !inp.keys.has("ArrowUp")) inp.y += (S.handBaseY - inp.y) * (1 - Math.exp(-3.2 * dt));
     inp.x = clamp(inp.x, S.R + 10, W - S.R - 10); inp.y = clamp(inp.y, S.handMinY, S.handMaxY);
   }
   acc += dt; let n = 0;
