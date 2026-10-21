@@ -688,28 +688,31 @@ const probe = document.createElement("div");
 probe.style.cssText = "position:fixed;visibility:hidden;pointer-events:none;padding:env(safe-area-inset-top,0) env(safe-area-inset-right,0) env(safe-area-inset-bottom,0) env(safe-area-inset-left,0)";
 document.body.appendChild(probe);
 let bg = null;
-/* ---- first-person projection ----
-   The physics runs in a flat "world" plane (x = sideways, y = down toward the floor, gravity +y).
-   The camera is your eyes looking down past your own hand at the bottom of the phone, so world-down
-   (toward the floor) is AWAY from you: it maps up-screen toward a vanishing point and shrinks with depth.
-   Things above the hand in the world (top of Around the World) come toward you and grow. */
-const P = { vpx: 0, hy: 0, Yh: 0, Yy0: 0, Dk: 2.3, VS: 1.6, Yf: 0, sf: .3 };
+/* ---- top-down projection ----
+   The physics runs in a flat "world" plane (x = sideways, y = straight down toward the floor, gravity +y).
+   The camera is the phone, held flat right above your own hand and looking straight DOWN at the floor:
+   your fist sits at the bottom of the screen with the forearm coming in from the bottom edge, and the yo-yo
+   drops AWAY from the camera, so it shrinks with depth and stays near the hand. The optical centre sits a
+   little above the hand on screen, so a falling yo-yo drifts slightly up along the (nearly end-on) string.
+   Anything above the hand in the world (the top of Around the World) comes toward the lens and grows. */
+const P = { Ox: 0, Oy: 0, Ay: 0, Yh: 0, Dc: 300, VS: 1.6, sf: .38, Ax: 0, Acy: 0 };
 function layoutView() {
   const chips = document.getElementById("tricks"), ar = app.getBoundingClientRect();
   const barTop = chips ? chips.getBoundingClientRect().top - ar.top - 44 : H * .78; // leave room for a 2-line hint
   const hwid = handW();
-  P.vpx = W / 2;
-  P.hy = insets.top + clamp(H * .27, 150, 250);                 // horizon / vanishing point, upper-middle
-  P.Yh = clamp(Math.min(H * .8, barTop - hwid * 1.05 - 6), H * .55, H * .82); // fist rests just above the bottom HUD
-  P.Yy0 = P.Yh + (H_HELD.y - H_PINCH.y) * hwid;                             // a held yo-yo peeks out above the fingers
-  const f = proj(W / 2, S.floorY); P.Yf = f.y; P.sf = f.s;
+  P.Yh = P.Ay = clamp(Math.min(H * .8, barTop - hwid * 1.05 - 6), H * .55, H * .82); // fingertips just above the bottom HUD
+  P.Ox = W / 2; P.Oy = P.Ay - clamp(H * .17, 90, 170);                               // optical centre (where depth converges)
+  P.Dc = .62 * Math.max(120, S.floorY - S.handBaseY);                                // lens height above the hand
+  P.sf = sDepth(S.floorY);
+  P.Ax = W / 2; P.Acy = H * .45;                                                      // camera anchor on screen
 }
+function sDepth(wy) { return clamp(P.Dc / Math.max(P.Dc * .55, P.Dc + (wy - S.handBaseY)), .05, 1.8); }
 function proj(wx, wy) {
-  const y0 = S.handBaseY + S.Lmin * .92, span = Math.max(60, S.floorY - y0), u = (wy - y0) / span;
-  if (u >= 0) { const z = 1 + u * P.Dk, s = 1 / z; return { x: P.vpx + (wx - P.vpx) * s, y: P.hy + (P.Yy0 - P.hy) * s, s, z, u }; }
-  const k = -u / Math.max(.02, S.Lmin * .92 / span), s = 1 + Math.min(.75, -u * .9);
-  return { x: clamp(wx, -40, W + 40), y: P.Yy0 + (P.Yh - P.Yy0) * Math.min(k, 1) + Math.max(0, k - 1) * 7, s, z: 1 / s, u };
+  const s = sDepth(wy), y0 = S.handBaseY + S.Lmin * .92, u = (wy - y0) / Math.max(60, S.floorY - y0);
+  return { x: P.Ox + (wx - P.Ox) * s, y: P.Oy + (P.Ay - P.Oy) * s, s, z: 1 / s, u };
 }
+// a point on the floor in floor units (u sideways, v forward; (W/2, Ay) is straight below the resting hand) -> scene
+function fproj(u, v) { return { x: P.Ox + (u - P.Ox) * P.sf, y: P.Oy + (v - P.Oy) * P.sf }; }
 function resize() {
   const r = app.getBoundingClientRect(); W = Math.max(1, r.width); H = Math.max(1, r.height);
   const cs = getComputedStyle(probe); insets = { top: parseFloat(cs.paddingTop) || 0, right: parseFloat(cs.paddingRight) || 0, bottom: parseFloat(cs.paddingBottom) || 0, left: parseFloat(cs.paddingLeft) || 0 };
@@ -725,80 +728,67 @@ function resize() {
 function rnd(seed) { let s = seed >>> 0; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); }
 function rgba(rgb, a) { return `rgba(${rgb},${a})`; }
 
-/* ---- themed arena backdrops (static layer, cached) ---- */
-function buildBg() {
-  bg = document.createElement("canvas"); bg.width = cv.width; bg.height = cv.height;
-  const g = bg.getContext("2d"); g.setTransform(DPR, 0, 0, DPR, 0, 0);
-  const c = TH.c, fy = P.hy, R = rnd(7);
+/* ---- themed floors, seen from straight above ----
+   A repeating texture tile (wood stage / neon grid / mown grass) plus a few vector decals, all drawn in floor
+   units under the floor's own depth scale, so the floor grows as the camera zooms down toward it. */
+let floorTile = null, floorPat = null, floorFor = "", vign = null;
+function buildBg() { floorTile = null; floorPat = null; floorFor = ""; vign = null; }
+function ensureFloor(g) {
+  const key = TH.kind + "|" + DPR + "|" + (g.canvas ? g.canvas.width : 0);
+  if (floorFor === key && floorPat) return;
+  floorFor = key; const c = TH.c, T = 256, td = Math.min(DPR, 1.25) * 1.6, cvT = document.createElement("canvas");
+  cvT.width = cvT.height = Math.round(T * td); const f = cvT.getContext("2d"); f.scale(td, td); const R = rnd(11);
   if (TH.kind === "park") {
-    let lg = g.createLinearGradient(0, 0, 0, fy); lg.addColorStop(0, c.skyTop); lg.addColorStop(.55, c.skyMid); lg.addColorStop(1, c.skyBot); g.fillStyle = lg; g.fillRect(0, 0, W, fy + 2);
-    const sx = W * .7, sy = fy - Math.min(H * .16, 150), sr = Math.min(W, H) * .13;
-    let rg = g.createRadialGradient(sx, sy, sr * .2, sx, sy, sr * 4); rg.addColorStop(0, rgba(c.sun, .55)); rg.addColorStop(1, rgba(c.sun, 0)); g.fillStyle = rg; g.fillRect(0, 0, W, fy);
-    rg = g.createRadialGradient(sx, sy - sr * .3, 0, sx, sy, sr); rg.addColorStop(0, "#fff6d8"); rg.addColorStop(1, "#ffc27a"); g.fillStyle = rg; g.beginPath(); g.arc(sx, sy, sr, 0, TAU); g.fill();
-    g.fillStyle = "rgba(255,230,240,.18)"; for (let i = 0; i < 6; i++) { const x = R() * W, y = fy * (.15 + R() * .45), w = 60 + R() * 120; g.beginPath(); g.ellipse(x, y, w, w * .22, 0, 0, TAU); g.ellipse(x + w * .4, y - 8, w * .5, w * .2, 0, 0, TAU); g.fill(); }
-    const hills = (col, base, amp, f, ph) => { g.fillStyle = col; g.beginPath(); g.moveTo(0, fy + 2); for (let x = 0; x <= W + 10; x += 10) g.lineTo(x, base - amp * (.5 + .5 * Math.sin(x * f + ph)) - amp * .3 * Math.sin(x * f * 2.7 + ph * 2)); g.lineTo(W, fy + 2); g.closePath(); g.fill(); };
-    hills(c.hillFar, fy - H * .05, H * .07, .012, 1); hills(c.hillNear, fy, H * .045, .02, 3);
-    g.fillStyle = "#2a1236"; for (let i = 0; i < 7; i++) { const x = (i + .5) / 7 * W + (R() - .5) * 30, h = 40 + R() * 50, y = fy - 4; g.fillRect(x - 2, y - h * .5, 4, h * .5); g.beginPath(); g.arc(x, y - h * .6, h * .28, 0, TAU); g.arc(x - h * .15, y - h * .45, h * .2, 0, TAU); g.arc(x + h * .15, y - h * .45, h * .2, 0, TAU); g.fill(); }
-    lg = g.createLinearGradient(0, fy, 0, H); lg.addColorStop(0, c.grassA); lg.addColorStop(1, c.grassB); g.fillStyle = lg; g.fillRect(0, fy, W, H - fy);
-    g.save(); g.beginPath(); g.rect(0, fy, W, H - fy); g.clip(); g.fillStyle = "rgba(255,255,255,.05)";
-    for (let i = -12; i <= 12; i += 2) { g.beginPath(); g.moveTo(P.vpx, fy); g.lineTo(P.vpx + i * W * .16, H + 40); g.lineTo(P.vpx + (i + 1) * W * .16, H + 40); g.closePath(); g.fill(); } g.restore();
-    g.strokeStyle = "rgba(160,220,120,.35)"; g.lineWidth = 1.2; for (let x = 0; x < W; x += 4) { const h = 4 + R() * 9; g.beginPath(); g.moveTo(x, fy + 2); g.lineTo(x + (R() - .5) * 4, fy + 2 - h); g.stroke(); }
-    g.fillStyle = "rgba(240,200,150,.16)"; g.beginPath(); g.ellipse(W / 2, fy + (H - fy) * .55, W * .5, (H - fy) * .35, 0, 0, TAU); g.fill();
-  } else {
-    let lg = g.createLinearGradient(0, 0, 0, fy); lg.addColorStop(0, c.wallTop); lg.addColorStop(.6, c.wallMid); lg.addColorStop(1, c.wallBot); g.fillStyle = lg; g.fillRect(0, 0, W, fy + 2);
-    if (TH.kind === "neon") {
-      for (let i = 0; i < 90; i++) { g.fillStyle = `rgba(255,255,255,${.2 + R() * .6})`; g.fillRect(R() * W, R() * fy * .7, R() < .1 ? 2 : 1, R() < .1 ? 2 : 1); }
-      const sx = W / 2, sy = fy - Math.min(H * .12, 110), sr = Math.min(W * .34, 220);
-      const sun = document.createElement("canvas"); sun.width = sun.height = Math.ceil(sr * 2 * DPR); const sg = sun.getContext("2d"); sg.scale(DPR, DPR);
-      let gg = sg.createLinearGradient(0, 0, 0, sr * 2); gg.addColorStop(0, "#ffe06a"); gg.addColorStop(.5, "#ff6a8a"); gg.addColorStop(1, "#c43bff"); sg.fillStyle = gg; sg.beginPath(); sg.arc(sr, sr, sr, 0, TAU); sg.fill();
-      sg.globalCompositeOperation = "destination-out"; for (let k = 0; k < 9; k++) { const y = sr * (1 + k * .11), hgt = 2 + k * 1.6; sg.fillRect(0, y, sr * 2, hgt); }
-      g.save(); g.globalAlpha = .8; g.shadowColor = "#ff3fd1"; g.shadowBlur = 40; g.drawImage(sun, sx - sr, sy - sr, sr * 2, sr * 2); g.restore();
-      g.fillStyle = "#0a0518"; for (let x = 0; x < W;) { const bw = 18 + R() * 40, bh = 30 + R() * fy * .25; g.fillRect(x, fy - bh, bw - 2, bh); for (let wy = fy - bh + 6; wy < fy - 6; wy += 9) for (let wx = x + 4; wx < x + bw - 6; wx += 7) if (R() < .18) { g.fillStyle = R() < .5 ? "rgba(62,240,255,.7)" : "rgba(255,63,209,.7)"; g.fillRect(wx, wy, 3, 3); g.fillStyle = "#0a0518"; } x += bw; }
-    } else {
-      // arena bowl: tiered bleachers with crowd lights, truss with lamps
-      const top = fy * .42; lg = g.createLinearGradient(0, top, 0, fy); lg.addColorStop(0, "rgba(0,0,0,0)"); lg.addColorStop(1, "rgba(0,0,0,.55)"); g.fillStyle = lg; g.fillRect(0, top, W, fy - top);
-      for (let row = 0; row < 7; row++) { const y = top + (fy - top) * (row / 7); g.fillStyle = `rgba(255,255,255,${.025 + row * .004})`; g.fillRect(0, y, W, 1); }
-      for (let i = 0; i < 160; i++) { const y = top + R() * (fy - top - 10), a = .08 + R() * .35; g.fillStyle = rgba(c.crowd, a * (y - top) / (fy - top)); const r = .8 + R() * 1.6; g.beginPath(); g.arc(R() * W, y, r, 0, TAU); g.fill(); }
-      g.fillStyle = "rgba(0,0,0,.45)"; for (let x = -6; x < W + 6; x += 9) { const r = 5 + R() * 3; g.beginPath(); g.arc(x, fy - 3 - R() * 4, r, Math.PI, 0); g.fill(); }
-      const ty = insets.top + 4; g.fillStyle = "#0b0809"; g.fillRect(0, ty, W, 6); g.fillStyle = "rgba(255,255,255,.06)"; g.fillRect(0, ty, W, 1);
-      for (let i = 0; i < 6; i++) { const x = (i + .5) / 6 * W; const rg = g.createRadialGradient(x, ty + 8, 0, x, ty + 8, 26); rg.addColorStop(0, rgba(c.beam, .9)); rg.addColorStop(.2, rgba(c.beam, .35)); rg.addColorStop(1, rgba(c.beam, 0)); g.fillStyle = rg; g.fillRect(x - 26, ty - 18, 52, 52); }
-    }
-    let rg = g.createRadialGradient(W * .5, fy * .78, 10, W * .5, fy * .78, Math.max(W, H) * .55); rg.addColorStop(0, rgba(c.glow, .16)); rg.addColorStop(1, rgba(c.glow, 0)); g.fillStyle = rg; g.fillRect(0, 0, W, fy);
-    // floor plane: lines converge on the vanishing point at the horizon
-    lg = g.createLinearGradient(0, fy, 0, H); lg.addColorStop(0, c.floorB); lg.addColorStop(.35, c.floorA); lg.addColorStop(1, c.floorB); g.fillStyle = lg; g.fillRect(0, fy, W, H - fy);
-    g.save(); g.beginPath(); g.rect(0, fy, W, H - fy); g.clip();
-    g.strokeStyle = rgba(c.line, TH.kind === "neon" ? .5 : .14); g.lineWidth = TH.kind === "neon" ? 1.4 : 1;
-    for (let i = -16; i <= 16; i++) { g.beginPath(); g.moveTo(P.vpx, fy); g.lineTo(P.vpx + i * W * .14, H + 40); g.stroke(); }
-    if (TH.kind !== "neon") for (let k = 1; k < 14; k++) { const y = fy + (H - fy) / (1 + (14 - k) * .55); g.globalAlpha = .7; g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); g.globalAlpha = 1; }
-    g.restore();
+    f.fillStyle = c.grassA; f.fillRect(0, 0, T, T);
+    f.fillStyle = "rgba(255,255,220,.07)"; f.fillRect(0, 0, T / 2, T);                 // mown stripes
+    f.fillStyle = "rgba(0,0,0,.08)"; f.fillRect(T / 2, 0, T / 2, T);
+    for (let i = 0; i < 900; i++) { const x = R() * T, y = R() * T, l = 3 + R() * 6, a = R() * TAU;
+      f.strokeStyle = R() < .5 ? "rgba(20,50,20,.35)" : "rgba(170,220,120,.28)"; f.lineWidth = .9; f.beginPath(); f.moveTo(x, y); f.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); f.stroke(); }
+    for (let i = 0; i < 6; i++) { const x = R() * T, y = R() * T; f.fillStyle = R() < .5 ? "rgba(255,240,250,.8)" : "rgba(255,220,90,.75)"; for (let p = 0; p < 5; p++) { f.beginPath(); f.arc(x + Math.cos(p * 1.26) * 2.2, y + Math.sin(p * 1.26) * 2.2, 1.6, 0, TAU); f.fill(); } f.fillStyle = "#ffc23a"; f.beginPath(); f.arc(x, y, 1.2, 0, TAU); f.fill(); }
+  } else if (TH.kind === "neon") {
+    const lg = f.createLinearGradient(0, 0, T, T); lg.addColorStop(0, c.floorA); lg.addColorStop(1, c.floorB); f.fillStyle = lg; f.fillRect(0, 0, T, T);
+    f.strokeStyle = "rgba(62,240,255,.12)"; f.lineWidth = 1; for (let k = 0; k < T; k += 32) { f.beginPath(); f.moveTo(k + .5, 0); f.lineTo(k + .5, T); f.moveTo(0, k + .5); f.lineTo(T, k + .5); f.stroke(); }
+    f.strokeStyle = "rgba(255,63,209,.55)"; f.lineWidth = 2; for (let k = 0; k < T; k += 128) { f.beginPath(); f.moveTo(k + 1, 0); f.lineTo(k + 1, T); f.moveTo(0, k + 1); f.lineTo(T, k + 1); f.stroke(); }
+    f.fillStyle = "rgba(255,120,230,.9)"; for (let a = 0; a <= T; a += 128) for (let b = 0; b <= T; b += 128) { f.beginPath(); f.arc(a + 1, b + 1, 2.4, 0, TAU); f.fill(); }
+  } else { // stage: dark polished wooden planks
+    f.fillStyle = c.floorA; f.fillRect(0, 0, T, T);
+    for (let p = 0; p < 4; p++) { const x = p * 64, j = R() * T; for (const y0 of [j - T, j]) {
+      const lg = f.createLinearGradient(x, 0, x + 64, 0); const t1 = .85 + R() * .3; lg.addColorStop(0, `rgba(70,40,24,${.35 * t1})`); lg.addColorStop(.5, `rgba(110,66,38,${.32 * t1})`); lg.addColorStop(1, `rgba(50,28,16,${.4 * t1})`);
+      f.fillStyle = lg; f.fillRect(x, y0, 64, T); f.fillStyle = "rgba(0,0,0,.55)"; f.fillRect(x, y0 + T - 1.5, 64, 1.5); }
+      f.fillStyle = "rgba(0,0,0,.6)"; f.fillRect(x, 0, 1.5, T);
+      f.strokeStyle = "rgba(255,210,150,.05)"; f.lineWidth = 1; for (let k = 0; k < 7; k++) { const gx = x + 6 + R() * 52; f.beginPath(); f.moveTo(gx, 0); f.bezierCurveTo(gx + 3, T * .3, gx - 3, T * .6, gx + 1, T); f.stroke(); } }
   }
-    // stage edge
-  let lg = g.createLinearGradient(0, 0, W, 0); lg.addColorStop(0, rgba(c.line, 0)); lg.addColorStop(.5, rgba(c.line, .8)); lg.addColorStop(1, rgba(c.line, 0));
-  g.fillStyle = lg; g.fillRect(0, fy - 1, W, 2);
-  lg = g.createLinearGradient(0, fy - 18, 0, fy); lg.addColorStop(0, rgba(c.line, 0)); lg.addColorStop(1, rgba(c.line, .12)); g.fillStyle = lg; g.fillRect(0, fy - 18, W, 18);
-  { const sr = Math.max(40, W * .9 * P.sf), y = P.Yf; // landing spot on the floor under the yo-yo
-    g.save(); g.translate(P.vpx, y); g.scale(1, .3); let rg2 = g.createRadialGradient(0, 0, 0, 0, 0, sr); rg2.addColorStop(0, rgba(c.beam, .26)); rg2.addColorStop(.7, rgba(c.beam, .07)); rg2.addColorStop(1, rgba(c.beam, 0)); g.fillStyle = rg2; g.beginPath(); g.arc(0, 0, sr, 0, TAU); g.fill();
-    g.strokeStyle = rgba(c.line, .35); g.lineWidth = 2.5; g.beginPath(); g.arc(0, 0, sr * .62, 0, TAU); g.stroke(); g.restore(); }
-  // near-floor darkening toward the viewer + vignette
-  { const lg2 = g.createLinearGradient(0, P.Yf, 0, H); lg2.addColorStop(0, "rgba(0,0,0,0)"); lg2.addColorStop(1, "rgba(0,0,0,.45)"); g.fillStyle = lg2; g.fillRect(0, P.Yf, W, H - P.Yf); }
-  const vg = g.createRadialGradient(W / 2, H * .45, Math.min(W, H) * .35, W / 2, H * .45, Math.max(W, H) * .8); vg.addColorStop(0, "rgba(0,0,0,0)"); vg.addColorStop(1, "rgba(0,0,0,.62)"); g.fillStyle = vg; g.fillRect(0, 0, W, H);
+  floorTile = cvT; floorPat = g.createPattern(cvT, "repeat");
+  if (floorPat.setTransform) floorPat.setTransform(new DOMMatrix().scale(1 / td));
 }
-function drawLive(g, t) {
-  const c = TH.c, fy = P.Yf + 30;
+function drawFloor(g, t, view) {
+  ensureFloor(g); const c = TH.c, sf = P.sf, cu = W / 2, cvv = P.Ay;
+  // visible scene rect -> floor units
+  const u0 = P.Ox + (view.x0 - P.Ox) / sf, u1 = P.Ox + (view.x1 - P.Ox) / sf, v0 = P.Oy + (view.y0 - P.Oy) / sf, v1 = P.Oy + (view.y1 - P.Oy) / sf;
+  g.save(); g.translate(P.Ox, P.Oy); g.scale(sf, sf); g.translate(-P.Ox, -P.Oy);
+  g.fillStyle = floorPat; g.fillRect(u0, v0, u1 - u0, v1 - v0);
+  const big = Math.max(W, H) / sf;
+  // one radial pass: warm light pool from above under the hand, falling off into darkness
+  const rg = g.createRadialGradient(cu, cvv - 40, 0, cu, cvv - 40, big * 1.05), dk = TH.kind === "park" ? "10,20,10" : "0,0,0";
+  rg.addColorStop(0, rgba(c.beam, TH.kind === "park" ? .2 : .16)); rg.addColorStop(.25, rgba(c.beam, .05)); rg.addColorStop(.4, "rgba(0,0,0,0)"); rg.addColorStop(1, rgba(dk, TH.kind === "park" ? .55 : .7));
+  g.fillStyle = rg; g.fillRect(u0, v0, u1 - u0, v1 - v0);
+  // decals: landing circle under the hand (stage marking / neon ring / worn grass patch)
+  const pulse = TH.kind === "neon" ? .75 + .25 * Math.sin(t * 2.2) : 1;
+  if (TH.kind === "park") { g.fillStyle = "rgba(120,90,40,.22)"; g.beginPath(); g.ellipse(cu, cvv, 210, 190, 0, 0, TAU); g.fill(); g.fillStyle = "rgba(90,70,30,.18)"; g.beginPath(); g.ellipse(cu + 10, cvv + 6, 140, 120, .3, 0, TAU); g.fill(); }
+  g.lineWidth = TH.kind === "neon" ? 6 : 5; g.strokeStyle = rgba(c.line, (TH.kind === "neon" ? .75 : .42) * pulse);
+  g.beginPath(); g.arc(cu, cvv, 230, 0, TAU); g.stroke();
+  g.lineWidth = 2.5; g.strokeStyle = rgba(c.line, .25 * pulse); g.beginPath(); g.arc(cu, cvv, 120, 0, TAU); g.stroke();
+  if (TH.kind !== "park") { g.setLineDash([22, 18]); g.lineWidth = 3; g.strokeStyle = rgba(c.line, .18); g.beginPath(); g.arc(cu, cvv, 520, 0, TAU); g.stroke(); g.setLineDash([]);
+    g.fillStyle = rgba(c.line, .5); g.beginPath(); g.arc(cu, cvv, 9, 0, TAU); g.fill(); }
+  g.restore();
+}
+function drawVignette(g) { // screen space, cached at low res
+  if (!vign) { vign = document.createElement("canvas"); vign.width = 160; vign.height = Math.round(160 * H / W); const v = vign.getContext("2d"), w = vign.width, h = vign.height;
+    const rg = v.createRadialGradient(w / 2, h * .5, Math.min(w, h) * .3, w / 2, h * .5, Math.max(w, h) * .75); rg.addColorStop(0, "rgba(0,0,0,0)"); rg.addColorStop(1, "rgba(0,0,0,.55)"); v.fillStyle = rg; v.fillRect(0, 0, w, h); }
+  g.drawImage(vign, 0, 0, W, H);
+}
+function drawLive(g, t) { // floating dust motes catching the light between the lens and the floor (screen space)
   g.globalCompositeOperation = "lighter";
-  if (TH.kind !== "park") {
-    const ty = insets.top + 10, n = TH.kind === "neon" ? 4 : 3;
-    for (let i = 0; i < n; i++) {
-      const x0 = (i + .5) / n * W, a = Math.sin(t * .35 + i * 2.1) * .32 + (i - (n - 1) / 2) * .12, len = fy - ty + 40, spread = .13;
-      const col = TH.kind === "neon" ? (i % 2 ? "255,63,209" : c.beam) : c.beam;
-      const lg = g.createLinearGradient(x0, ty, x0 + Math.sin(a) * len, ty + Math.cos(a) * len); lg.addColorStop(0, rgba(col, .16)); lg.addColorStop(1, rgba(col, 0));
-      g.fillStyle = lg; g.beginPath(); g.moveTo(x0, ty); g.lineTo(x0 + Math.sin(a - spread) * len, ty + Math.cos(a - spread) * len); g.lineTo(x0 + Math.sin(a + spread) * len, ty + Math.cos(a + spread) * len); g.closePath(); g.fill();
-    }
-  }
-  if (TH.kind === "neon") { // scrolling synthwave grid
-    g.strokeStyle = "rgba(255,63,209,.35)"; g.lineWidth = 1.2; const N = 12, o = (t * .35) % 1;
-    for (let k = 0; k < N; k++) { const y = P.hy + (H - P.hy) * ((k + o) / N) ** 2.2; g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); }
-  }
   for (const b of bokeh) { const x = ((b.x + Math.sin(t * b.s * 6 + b.p) * .03) % 1) * W, y = ((b.y - t * b.s * .3) % 1 + 1) % 1 * H; g.globalAlpha = b.a; g.drawImage(glowSprite, x - b.r, y - b.r, b.r * 2, b.r * 2); }
   g.globalAlpha = 1; g.globalCompositeOperation = "source-over";
 }
@@ -953,7 +943,7 @@ const pose = { wX: 0, wY: 0, af: 0, th: 0, hw: 0, fs: 1 };
 function solveArm(px, py, depthS) {
   const hs = clamp(1 + rig.oy * .0035, .84, 1.16) * clamp(depthS, .6, 1.15), hw = handW() * hs;
   const fs = 1 - clamp(rig.bend, 0, 1) * .28 + clamp(-rig.bend, 0, 1) * .08; // wrist flick foreshortens the fist
-  const dir0 = -Math.PI / 2 - .3, D = handW() * 4.4, ax = W / 2 - D * Math.cos(dir0) + W * .1, ay = P.Yh - D * Math.sin(dir0);
+  const dir0 = -Math.PI / 2 - .13, D = handW() * 4.4, ax = W / 2 - D * Math.cos(dir0) + W * .03, ay = P.Yh - D * Math.sin(dir0); // shoulder far below the bottom edge: the forearm rises from the bottom like it's holding the phone
   let af = rig.af, wX = px, wY = py;
   for (let i = 0; i < 3; i++) { const th = af + Math.PI / 2 + rig.bend * .35, c = Math.cos(th), s = Math.sin(th), lx = H_PINCH.x * hw, ly = H_PINCH.y * hw * fs;
     wX = px - (c * lx - s * ly); wY = py - (s * lx + c * ly); af = Math.atan2(wY - ay, wX - ax); }
@@ -1111,53 +1101,63 @@ function drawParticles(g, list) {
   g.globalAlpha = 1; g.globalCompositeOperation = "source-over";
 }
 
-/* ================= Dynamic camera =================
-   A spring-driven 2D camera over the projected scene (the DOM HUD is never touched):
-   held -> hand framing, throw -> push in and track the yo-yo with a little lead (the hand may slide off the bottom),
-   sleep / Walk the Dog -> ease out to a wide shot of yo-yo + floor + string + hand (held for a beat),
-   swings -> moderate framing around the hand and arc, bind/return -> push back in and follow it home.
-   Zoom stays >= 1 and the view is clamped inside the backdrop, so no edges ever show. */
+/* ================= Dynamic camera (top-down) =================
+   A spring-driven 2D lens over the projected scene (the DOM HUD is never touched). screen = (p - cam) * z + anchor.
+   - held: neutral (z 1), fist at the bottom edge.
+   - throw / sleep / return: zoom follows the yo-yo down so it stays about the same size on screen
+     (z ~ 0.85 / depthScale, capped), easing it toward the upper-middle; the fist slides down off the bottom
+     and the floor grows as the lens closes in on it. On the way back the zoom unwinds and settles on the hand.
+   - swings: moderate framing of hand + arc.
+   - Walk the Dog / rolling on the floor: zoom OUT to frame the hand and the rolling yo-yo, hold, then zoom back in. */
+let floorBuf = null, floorCtx = null;
 const cam = { x: 0, y: 0, z: 1, vx: 0, vy: 0, vz: 0, wideHold: 0, mode: "neutral", init: false };
 function camTarget(dt) {
-  if (!playing) { cam.mode = "neutral"; return { x: W / 2, y: H / 2, z: 1 }; }
+  const A = { x: P.Ax, y: P.Acy };
+  if (!playing) { cam.mode = "neutral"; return { x: A.x, y: A.y, z: 1 }; }
   const yq = proj(S.yo.x, S.yo.y), hq = proj(S.hand.x, S.hand.y), red = S.reduced ? .3 : 1;
-  let x = W / 2, y = H / 2, z = 1, mode = S.phase;
+  let x = A.x, y = A.y, z = 1, mode = S.phase;
   const floorTrick = S.onFloor || (S.phase === "sleep" && S.hand.y > S.handBaseY + 30 && S.floorY - (S.yo.y + S.R) < S.R * 1.5);
   if (floorTrick) cam.wideHold = .9; else cam.wideHold = Math.max(0, cam.wideHold - dt);
-  if (S.phase === "held") { mode = "hand"; x = W / 2; y = lerp(H / 2, P.Yh, .32); z = 1.1; }
-  else if (S.phase === "out") {
-    mode = "follow"; const lq = proj(S.yo.x + S.yo.vx * .12, S.yo.y + S.yo.vy * .12);
-    x = lerp(hq.x, lq.x, .68); y = lerp(hq.y, lq.y, .78); z = 1.32;
-  } else if (S.phase === "return") { mode = "return"; x = lerp(yq.x, hq.x, .4); y = lerp(yq.y, hq.y, .4); z = 1.2; }
-  else if (cam.wideHold > 0) { mode = "wide"; x = W / 2; y = H / 2; z = 1; }
-  else { // sleep / dead / swings: frame the hand, the yo-yo, the floor under it and the string between
-    const fq = proj(S.yo.x, S.floorY), R = S.R * P.VS;
-    const x0 = Math.min(yq.x, hq.x, fq.x) - R * 2, x1 = Math.max(yq.x, hq.x, fq.x) + R * 2, y0 = Math.min(yq.y, fq.y) - R * 2, y1 = hq.y + handW() * .9;
-    const swing = Math.abs(S.yo.vx) > 260 * S.scale || S.yo.y < S.hand.y + S.L * .55;
-    mode = swing ? "swing" : "frame";
-    z = clamp(Math.min(W / (x1 - x0 + 40), (H * .72) / (y1 - y0 + 40)), 1, swing ? 1.07 : 1.16);
-    x = (x0 + x1) / 2; y = (y0 + y1) / 2 + H * .05; // bottom HUD is taller, so sit the shot a touch high
+  const swing = S.phase === "sleep" && (Math.abs(S.yo.vx) > 260 * S.scale || S.yo.y < S.hand.y + S.L * .55);
+  if (S.phase === "held") { mode = "hand"; }
+  else if (cam.wideHold > 0 && S.phase !== "return") { // frame the fist and the rolling yo-yo together
+    mode = "wide"; const hw = handW(), x0 = Math.min(yq.x, hq.x - hw * .6) - 60, x1 = Math.max(yq.x, hq.x + hw * .6) + 60, y0 = Math.min(yq.y, hq.y - hw) - 70, y1 = hq.y + hw * .7;
+    z = clamp(Math.min(W / (x1 - x0), H * .62 / (y1 - y0)), .85, 1.05); const zz = 1 + (z - 1) * red;
+    x = (x0 + x1) / 2; y = (y0 + y1) / 2 - (H * .47 - A.y) / zz; // centre the pair a little above the bottom HUD
+    return { x, y, z: zz, mode };
+  } else if (swing) {
+    mode = "swing"; z = 1.18; const cx = lerp(hq.x, yq.x, .5), cy = lerp(hq.y, yq.y, .5);
+    x = A.x + (cx - A.x) * .6; y = A.y + (cy - A.y) * .5;
+  } else { // out / sleep / dead / return: keep the yo-yo about the same size on screen
+    mode = S.phase === "out" ? "follow" : S.phase === "return" ? "return" : "follow";
+    const lead = S.phase === "out" ? .1 : .05, lq = proj(S.yo.x + S.yo.vx * lead, S.yo.y + S.yo.vy * lead);
+    z = clamp(.86 / lq.s, 1, 2.3); const zz = 1 + (z - 1) * red;
+    // zoom in around the fist: the fingers slide down to the bottom edge, the yo-yo stays just above them
+    const k = clamp((zz - 1) / 1.1, 0, 1), tx = lerp(lq.x, W / 2 + (lq.x - W / 2) * .4, k), ty = lerp(hq.y, H * .8, k);
+    x = lq.x - (tx - A.x) / zz; y = hq.y - (ty - A.y) / zz;
+    return { x, y, z: zz, mode };
   }
-  cam.mode = mode;
-  return { x, y, z: 1 + (z - 1) * red };
+  return { x, y, z: 1 + (z - 1) * red, mode };
 }
-function camClamp() { const z = Math.max(1, cam.z); cam.x = clamp(cam.x, W / 2 / z, W - W / 2 / z); cam.y = clamp(cam.y, H / 2 / z, H - H / 2 / z); }
 function camUpdate(dt) {
-  const t = camTarget(dt);
-  if (!cam.init) { Object.assign(cam, { x: t.x, y: t.y, z: t.z, vx: 0, vy: 0, vz: 0, init: true }); camClamp(); return; }
-  const w = S.reduced ? 3.2 : (cam.mode === "follow" ? 7 : cam.mode === "wide" ? 3.4 : 4.6), wz = S.reduced ? 2.6 : (cam.mode === "wide" ? 2.8 : cam.mode === "follow" ? 7.5 : 4.2), zeta = .92;
+  const t = camTarget(dt); cam.mode = t.mode || cam.mode;
+  if (!cam.init) { Object.assign(cam, { x: t.x, y: t.y, z: t.z, vx: 0, vy: 0, vz: 0, init: true }); return; }
+  const fast = cam.mode === "follow" || cam.mode === "return";
+  const w = S.reduced ? 3 : (fast ? 6.5 : cam.mode === "wide" ? 3.2 : 4.4), wz = S.reduced ? 2.4 : (fast ? 5.5 : cam.mode === "wide" ? 2.6 : 4), zeta = .95;
   let n = Math.max(1, Math.ceil(dt / (1 / 240))); const h = dt / n;
   while (n-- > 0) {
     cam.vx += (w * w * (t.x - cam.x) - 2 * zeta * w * cam.vx) * h; cam.vy += (w * w * (t.y - cam.y) - 2 * zeta * w * cam.vy) * h;
     cam.vz += (wz * wz * (t.z - cam.z) - 2 * zeta * wz * cam.vz) * h;
     cam.x += cam.vx * h; cam.y += cam.vy * h; cam.z += cam.vz * h;
   }
-  cam.z = clamp(cam.z, 1, 1.4); camClamp();
+  cam.z = clamp(cam.z, .8, 2.4);
+  // never pan so far that the forearm's end (below the bottom edge) could come into view
+  cam.y = Math.min(cam.y, P.Ay + handW() * 3.2 - (H - P.Acy) / cam.z);
   // keep a hovering mouse cursor glued to the hand while the camera pans/zooms
   if (playing && inp.mcx != null && !tilt.live && (!drag || drag.mouse)) inp.x = camInvX(inp.mcx);
 }
 // screen -> scene x (mouse hover follows the cursor even while the camera is zoomed/panned)
-function camInvX(clientX) { const r = cv.getBoundingClientRect(); return (clientX - r.left - W / 2) / cam.z + cam.x; }
+function camInvX(clientX) { const r = cv.getBoundingClientRect(); return (clientX - r.left - P.Ax) / cam.z + cam.x; }
 let frameDtVis = 1 / 60;
 let fogSprite = null, fogFor = "";
 function ensureFog() { if (fogFor === TH.c.fog) return; fogFor = TH.c.fog; const c = document.createElement("canvas"); c.width = c.height = 64; const g = c.getContext("2d"); const r = g.createRadialGradient(32, 32, 10, 32, 32, 32); r.addColorStop(0, rgba(TH.c.fog, 0)); r.addColorStop(.5, rgba(TH.c.fog, .55)); r.addColorStop(1, rgba(TH.c.fog, 0)); g.fillStyle = r; g.fillRect(0, 0, 64, 64); fogSprite = c; }
@@ -1167,55 +1167,62 @@ function projParticles(list) { // world particles -> screen, sized by depth
     out[i] = { kind: p.kind, x: q.x, y: q.y, vx: p.vx * q.s, vy: -p.vy * q.s, life: p.life, max: p.max, size: p.size * m, rot: p.rot, col: p.col }; }
   return out;
 }
-function drawYoyoDepth(g, q, R, m, ang, omega, hot, t) { // yo-yo at depth: fog + slight depth blur when far
-  const fog = clamp((q.z - 1.25) / (P.Dk * .9), 0, 1);
+function drawYoyoDepth(g, q, R, m, ang, omega, hot, t) { // seen from above: face/rim art, a touch dimmer as it drops away from the light
   drawYoyo(g, q.x, q.y, R, m, ang, omega, frameDtVis, hot, 1, t);
-  // cheap depth-of-field: a soft fogged halo softens the silhouette of far yo-yos (ctx.filter blur is far too slow on CPU raster)
-  if (fog > .25 && !S.reduced) { const hr = R * 1.9; g.globalAlpha = (fog - .25) * .55; g.drawImage(fogSprite, q.x - hr, q.y - hr, hr * 2, hr * 2); g.globalAlpha = 1; }
-  if (fog > 0) { g.globalAlpha = fog * .5; g.fillStyle = rgba(TH.c.fog, 1); g.beginPath(); g.arc(q.x, q.y, R * 1.02, 0, TAU); g.fill(); g.globalAlpha = 1; }
+  const dim = clamp((1 - q.s) * .32, 0, .22);
+  if (dim > .01) { g.globalAlpha = dim; g.fillStyle = "#000"; g.beginPath(); g.arc(q.x, q.y, R * 1.02, 0, TAU); g.fill(); g.globalAlpha = 1; }
 }
 function render(alpha) {
-  ensureFog();
   const g = ctx; g.setTransform(1, 0, 0, 1, 0, 0);
   const pz = 1 + S.punch, sx = S.shake ? (Math.random() - .5) * S.shake * 2 : 0, sy = S.shake ? (Math.random() - .5) * S.shake * 2 : 0;
-  const ox = W / 2, oy = P.hy + (P.Yh - P.hy) * .4;
-  if (pz > 1.001 || sx || sy) { g.fillStyle = "#000"; g.fillRect(0, 0, cv.width, cv.height); }
-  g.setTransform(DPR * pz, 0, 0, DPR * pz, DPR * (ox - ox * pz + sx * .5), DPR * (oy - oy * pz + sy * .5));
-  g.translate(W / 2, H / 2); g.scale(cam.z, cam.z); g.translate(-cam.x, -cam.y); // dynamic camera
-  g.drawImage(bg, 0, 0, W, H);
+  const ox = W / 2, oy = H * .45;
+  const z = cam.z * pz, mg = 30 / z, view = { x0: cam.x - (P.Ax + 20) / z - mg, x1: cam.x + (W - P.Ax + 20) / z + mg, y0: cam.y - (P.Acy + 20) / z - mg, y1: cam.y + (H - P.Acy + 20) / z + mg };
   const t = S.time;
-  drawLive(g, t);
+  // the floor is soft and far away: draw it into a low-res buffer (<= 1.25 px per CSS px) and upscale with one blit
+  const FR = Math.min(DPR, 1.25), fw = Math.round(W * FR), fh = Math.round(H * FR);
+  if (!floorBuf || floorBuf.width !== fw || floorBuf.height !== fh) { floorBuf = document.createElement("canvas"); floorBuf.width = fw; floorBuf.height = fh; floorCtx = floorBuf.getContext("2d", { alpha: false }); floorPat = null; floorFor = ""; }
+  const fg = floorCtx; fg.setTransform(1, 0, 0, 1, 0, 0); fg.fillStyle = "#000"; fg.fillRect(0, 0, fw, fh);
+  const camXf = (c, k) => { c.setTransform(k * pz, 0, 0, k * pz, k * (ox - ox * pz + sx * .5), k * (oy - oy * pz + sy * .5)); c.translate(P.Ax, P.Acy); c.scale(cam.z, cam.z); c.translate(-cam.x, -cam.y); };
+  camXf(fg, FR); drawFloor(fg, t, view);
+  g.imageSmoothingEnabled = true; g.drawImage(floorBuf, 0, 0, cv.width, cv.height);
+  camXf(g, DPR); // dynamic camera
   g.translate(sx * .5, sy * .5);
   const hxW = lerp(S.hand.px, S.hand.x, alpha), hyW = lerp(S.hand.py, S.hand.y, alpha), yxW = lerp(S.yo.px, S.yo.x, alpha), yyW = lerp(S.yo.py, S.yo.y, alpha);
   const ang = lerp(S.pAngle, S.angle, alpha), m = S.cfg, hot = clamp((S.spin - 30) / 50, 0, 1);
   const hq = proj(hxW, hyW), held = S.phase === "held" && playing;
   const pX = hq.x + (playing ? rig.ox : 0), pY = hq.y + (playing ? rig.oy : 0);
   if (playing) solveArm(pX, pY, hq.s);
+  // the fist's soft shadow on the floor far below (light from above, slightly up-left)
+  if (playing) { const hh = Math.max(0, S.floorY - hyW), fs = fproj(hxW + 18 + hh * .08, P.Ay + 30 + hh * .1), sr = handW() * .95 * P.sf * 1.5;
+    const rg = g.createRadialGradient(fs.x, fs.y, 0, fs.x, fs.y, sr); rg.addColorStop(0, "rgba(0,0,0,.32)"); rg.addColorStop(1, "rgba(0,0,0,0)"); g.fillStyle = rg; g.beginPath(); g.arc(fs.x, fs.y, sr, 0, TAU); g.fill(); }
   let q = proj(yxW, yyW);
   if (held) { const hp = handPoint(H_HELD.x, H_HELD.y); q = { x: hp.x, y: hp.y, s: 1, z: 1, u: 0 }; }
   const R = S.R * P.VS * q.s;
-  // contact shadow on the floor: grows darker and sharper as the yo-yo nears it
+  // contact shadow straight below on the floor: darker and sharper as the yo-yo nears it
   const gap = clamp((S.floorY - (yyW + S.R)) / Math.max(80, (S.floorY - S.handBaseY) * .7), 0, 1);
-  if (!held || !playing) { const f = proj(yxW, S.floorY), sr = S.R * P.VS * f.s * (1 + gap * 1.6), a = .62 * (1 - gap * .85);
-    g.save(); g.translate(f.x, f.y); g.scale(1, .32); const rg = g.createRadialGradient(0, 0, 0, 0, 0, sr); rg.addColorStop(0, `rgba(0,0,0,${a})`); rg.addColorStop(clamp(.75 - gap * .65, .1, .75), `rgba(0,0,0,${a * .8})`); rg.addColorStop(1, "rgba(0,0,0,0)"); g.fillStyle = rg; g.beginPath(); g.arc(0, 0, sr, 0, TAU); g.fill(); g.restore(); }
+  if (!held || !playing) { const hh = Math.max(0, S.floorY - yyW - S.R), f = fproj(yxW + hh * .12, P.Ay + hh * .16), sr = S.R * P.VS * P.sf * (1.05 + gap * 1.1), a = .6 * (1 - gap * .7);
+    const rg = g.createRadialGradient(f.x, f.y, 0, f.x, f.y, sr); rg.addColorStop(0, `rgba(0,0,0,${a})`); rg.addColorStop(clamp(.78 - gap * .6, .15, .78), `rgba(0,0,0,${a * .75})`); rg.addColorStop(1, "rgba(0,0,0,0)");
+    g.fillStyle = rg; g.beginPath(); g.arc(f.x, f.y, sr, 0, TAU); g.fill(); }
   if (hot > 0 || S.attract) { const gr = R * (2.6 + hot * 1.4); g.globalCompositeOperation = "lighter"; g.globalAlpha = .16 + hot * .28; g.drawImage(glowSprite, q.x - gr, q.y - gr, gr * 2, gr * 2); g.globalAlpha = 1; g.globalCompositeOperation = "source-over"; }
-  // string from the fingers out to the axle; slack sags away from you
-  const dW = Math.hypot(yxW - hxW, yyW - hyW), slack = held ? 0 : Math.sqrt(Math.max(0, S.L * S.L - dW * dW)) * .45 * (hq.s + q.s) * .5;
-  const nearer = q.u < -.02 && !held; // yo-yo closer to the camera than the fist (top of Around the World)
+  // string from the fingers down to the axle: seen nearly end-on, so it's a short line
+  const dW = Math.hypot(yxW - hxW, yyW - hyW), slack = held ? 0 : Math.sqrt(Math.max(0, S.L * S.L - dW * dW)) * .2 * (hq.s + q.s) * .5;
+  const nearer = q.u < -.02 && !held; // yo-yo closer to the lens than the fist (top of Around the World)
   const drawYo = () => {
     const sp = Math.hypot(S.yo.vx, S.yo.vy);
     if (sp > 520 * S.scale && !held && !S.reduced) for (let i = 3; i >= 1; i--) { const gq = proj(yxW - S.yo.vx * .009 * i, yyW - S.yo.vy * .009 * i); drawYoyo(g, gq.x, gq.y, S.R * P.VS * gq.s * (1 - i * .03), m, ang, 0, 0, 0, .09, t); }
     drawYoyoDepth(g, q, R, m, ang, S.reduced ? 0 : S.rollDir * S.spin * .5, hot, t);
   };
-  if (!nearer) { if (playing || S.attract) drawString(g, pX, pY, q.x, q.y + R * .1, Math.min(60, slack), S.tension, S.tangled, t, S.R * .35); drawYo(); }
+  if (!nearer) { if (playing || S.attract) drawString(g, pX, pY, q.x, q.y, Math.min(30, slack), S.tension, S.tangled, t, S.R * .35); drawYo(); }
   if (playing) drawArm(g);
-  if (nearer) { drawString(g, pX, pY, q.x, q.y, Math.min(60, slack), S.tension, S.tangled, t, S.R * .35); drawYo(); }
+  if (nearer) { drawString(g, pX, pY, q.x, q.y, Math.min(30, slack), S.tension, S.tangled, t, S.R * .35); drawYo(); }
   drawParticles(g, projParticles(S.particles));
   g.textAlign = "center"; g.textBaseline = "middle"; g.lineJoin = "round";
-  for (const f of S.floaters) { const fq = proj(f.x, f.y + S.R + 12), a = clamp(f.life / .4, 0, 1), sc = (1 + Math.max(0, f.life - f.max + .15) * 3) * clamp(fq.s * 1.6, .7, 1.3);
+  for (const f of S.floaters) { const fq = proj(f.x, f.y), a = clamp(f.life / .4, 0, 1), sc = (1 + Math.max(0, f.life - f.max + .15) * 3) / Math.max(1, cam.z * .8);
     g.font = `${Math.round(18 + 8 * S.scale)}px "Lilita One", Outfit, sans-serif`;
-    g.globalAlpha = a; g.save(); g.translate(fq.x, fq.y - 28 * fq.s - (f.max - f.life) * 30); g.scale(sc, sc); g.lineWidth = 4; g.strokeStyle = "rgba(0,0,0,.6)"; g.strokeText(f.text, 0, 0); g.fillStyle = TH.css.hi; g.fillText(f.text, 0, 0); g.restore(); }
+    g.globalAlpha = a; g.save(); g.translate(fq.x, fq.y - (S.R * P.VS * fq.s + 18 / cam.z) - (f.max - f.life) * 30 / cam.z); g.scale(sc, sc); g.lineWidth = 4; g.strokeStyle = "rgba(0,0,0,.6)"; g.strokeText(f.text, 0, 0); g.fillStyle = TH.css.hi; g.fillText(f.text, 0, 0); g.restore(); }
   g.globalAlpha = 1;
+  // screen-space: dust in the air + lens vignette (not affected by the camera)
+  g.setTransform(DPR, 0, 0, DPR, 0, 0); drawLive(g, t); drawVignette(g);
 }
 /* ================= Input: touch / mouse ================= */
 let drag = null;
